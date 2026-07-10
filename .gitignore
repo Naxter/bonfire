@@ -1,0 +1,34 @@
+# --- Secrets: never commit ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+*.tsbuildinfo
+next-env.d.ts
+
+# --- Receipt data: SQLite DB, inbox, archive, backups ---
+# Yours only; copy the DB between machines with scp, not git.
+data/
+backend/data/
+
+# --- Receipt data (belt-and-suspenders) ---
+*.pdf
+*.db
+*.sqlite
+*.sqlite3
+!**/.gitkeep
+
+# --- IDE / local tooling ---
+.idea/
+.claude/

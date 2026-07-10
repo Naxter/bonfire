@@ -1,0 +1,11 @@
+[Unit]
+Description=Bonfire - poll GMX for new REWE eBons hourly
+
+[Timer]
+# Every hour, and shortly after boot. Catches up if the Pi was off (Persistent).
+OnBootSec=3min
+OnUnitActiveSec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,20 @@
+[Unit]
+Description=Bonfire - fetch new REWE eBons from GMX inbox
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/bonfire/email-scraper
+ExecStart=/home/pi/bonfire/venv/bin/python scraper.py
+
+# Hardening — check with: systemd-analyze security bonfire-rewe-scrape.service
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/home/pi/bonfire/backend/data

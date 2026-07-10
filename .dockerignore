@@ -1,0 +1,22 @@
+# Keep the build context small and never bake secrets or data into an image.
+.env
+.git/
+.claude/
+venv/
+
+# Receipt data, SQLite DB, archive, backups — bind-mounted at runtime instead.
+data/
+backend/data/
+*.pdf
+*.db
+*.sqlite*
+
+# Build artefacts / caches
+**/node_modules/
+**/.next/
+**/__pycache__/
+**/*.pyc
+
+# Docs & deploy files aren't needed inside the images
+*.md
+deploy/

@@ -1,0 +1,25 @@
+[Unit]
+Description=Bonfire - inbox watcher (auto-ingests dropped/scraped PDFs)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/bonfire/backend
+ExecStart=/home/pi/bonfire/venv/bin/python watch_inbox.py
+Restart=on-failure
+RestartSec=5
+
+# Hardening — check with: systemd-analyze security bonfire-watcher.service
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/home/pi/bonfire/backend/data
+
+[Install]
+WantedBy=multi-user.target

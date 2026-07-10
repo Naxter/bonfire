@@ -1,0 +1,29 @@
+[Unit]
+Description=Bonfire - Next.js frontend (production build)
+After=network-online.target bonfire-backend.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/bonfire/frontend
+# Serve the production build (run `npm run build` once, and again after code changes).
+ExecStart=/usr/bin/npm run start
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Restart=on-failure
+RestartSec=5
+
+# Hardening — check with: systemd-analyze security bonfire-frontend.service
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# next start writes its incremental cache under .next/
+ReadWritePaths=/home/pi/bonfire/frontend/.next
+
+[Install]
+WantedBy=multi-user.target

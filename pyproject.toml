@@ -1,0 +1,23 @@
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+include = ["backend/**/*.py", "email-scraper/*.py"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # import sorting
+    "B",   # bugbear
+    "UP",  # pyupgrade
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Depends()/File() in defaults is the FastAPI idiom.
+"backend/app/main.py" = ["B008"]
+# LLM prompt text; long lines read better than wrapped prose.
+"backend/app/stores/dm.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]

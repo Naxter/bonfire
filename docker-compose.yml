@@ -1,0 +1,103 @@
+name: bonfire
+
+# All Python services share one image and one data bind-mount. The host keeps
+# the SQLite DB, inbox, archive and backups under
+#   ./backend/data
+# so `docker compose down -v` can never eat your receipt history.
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: docker/backend.Dockerfile
+  image: bonfire-backend:latest
+  # Run as the host user (Pi default uid/gid 1000): everything the services
+  # create in the bind-mounted data dir stays writable from the host (manual
+  # DM drops, venv tools). Root-created inbox dirs had locked the host user out.
+  user: "1000:1000"
+  # NOTE: deliberately no `env_file:`. Every entrypoint loads /app/.env itself
+  # via python-dotenv, and Compose's env-file parser disagrees with python-dotenv
+  # on quoting and inline `#`. Because load_dotenv() defaults to override=False,
+  # anything Compose injected would silently win — mangling passwords containing
+  # `#`, quotes or `$`. One file, one parser.
+  environment:
+    TZ: ${TZ:-Europe/Berlin}
+  volumes:
+    - ./backend/data:/app/backend/data
+    - ./.env:/app/.env:ro
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  restart: unless-stopped
+
+services:
+  # LAN-only deployment: ports are published so your phone/laptop on the same
+  # WiFi can reach the dashboard and API directly (see README "Security & scope").
+  backend:
+    <<: *backend
+    container_name: bonfire-backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # Ingests any PDF/photo dropped into data/inbox (incl. what the scraper fetches).
+  # Polling instead of inotify: events don't reliably cross bind mounts.
+  watcher:
+    <<: *backend
+    container_name: bonfire-watcher
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      WATCHER_POLLING: "1"
+    command: python watch_inbox.py
+
+  # Pulls new REWE eBons from GMX on an interval (default hourly).
+  scraper:
+    <<: *backend
+    container_name: bonfire-scraper
+    working_dir: /app/email-scraper
+    command: sh -c 'while true; do python scraper.py || true; sleep ${SCRAPE_INTERVAL_SECONDS:-3600}; done'
+
+  # Online SQLite snapshot on an interval (default daily), keeps BACKUP_KEEP copies.
+  # Backup FIRST, then sleep — sleeping first meant no backup existed until 24h
+  # after every container (re)create, i.e. often never.
+  backup:
+    <<: *backend
+    container_name: bonfire-backup
+    command: sh -c 'while true; do python backup_db.py || true; sleep ${BACKUP_INTERVAL_SECONDS:-86400}; done'
+
+  # Optional: `docker compose --profile telegram up -d`
+  telegram:
+    <<: *backend
+    container_name: bonfire-telegram
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      GROCERY_API_URL: http://backend:8000
+    command: python telegram_bot.py
+    profiles: ["telegram"]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        # Baked in at build time — must be reachable from your browser.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    image: bonfire-frontend:latest
+    container_name: bonfire-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    restart: unless-stopped

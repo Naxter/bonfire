@@ -1,0 +1,181 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-display: var(--font-manrope);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+}
+
+/* ============================================================
+   CALM THEME — soft sage on muted slate
+   ============================================================ */
+:root,
+.dark {
+  --radius: 0.75rem;
+
+  --background: #141b26;
+  --foreground: #dfe6ee;
+
+  --card: #1b2431;
+  --card-foreground: #dfe6ee;
+
+  --popover: #1b2431;
+  --popover-foreground: #dfe6ee;
+
+  --primary: #7aa07a;              /* sage */
+  --primary-foreground: #10160f;
+
+  --secondary: #222c3a;
+  --secondary-foreground: #cdd6e0;
+
+  --muted: #1c2634;
+  --muted-foreground: #8b97a6;
+
+  --accent: #2a3644;
+  --accent-foreground: #dfe6ee;
+
+  --destructive: #c96f6f;          /* muted red */
+
+  --border: rgba(150, 170, 190, 0.14);
+  --input: rgba(150, 170, 190, 0.14);
+  --ring: #7aa07a;
+
+  /* Chart palette — muted sage / slate-blue / rose / gold / lavender */
+  --chart-1: #7aa07a;
+  --chart-2: #6b8cae;
+  --chart-3: #b98a8a;
+  --chart-4: #c9a978;
+  --chart-5: #8f86b5;
+
+  --sidebar: #1b2431;
+  --sidebar-foreground: #dfe6ee;
+  --sidebar-primary: #7aa07a;
+  --sidebar-primary-foreground: #10160f;
+  --sidebar-accent: #2a3644;
+  --sidebar-accent-foreground: #dfe6ee;
+  --sidebar-border: rgba(150, 170, 190, 0.14);
+  --sidebar-ring: #7aa07a;
+
+  /* Accent helper tokens */
+  --neon: #8cb08c;
+  --neon-soft: rgba(140, 176, 140, 0.30);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-attachment: fixed;
+  }
+}
+
+/* --- Soft, quiet background --- */
+.app-grid-bg {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(1100px 600px at 82% -12%, rgba(122, 160, 122, 0.05), transparent 62%),
+    radial-gradient(900px 520px at 2% 6%, rgba(107, 140, 174, 0.045), transparent 60%);
+}
+
+/* --- Quiet card panel --- */
+.hud-panel {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.hud-panel:hover {
+  border-color: rgba(150, 170, 190, 0.26);
+  box-shadow: 0 6px 20px -12px rgba(0, 0, 0, 0.55);
+}
+/* HUD accent line + corner brackets removed for a calmer look */
+.hud-panel::before { content: none; }
+.hud-corners::after,
+.hud-corners::before { content: none; }
+
+/* --- Typographic helpers --- */
+.hud-label {
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.font-display { font-family: var(--font-manrope), var(--font-inter), sans-serif; }
+
+.neon-text {
+  color: #eef3f8;
+}
+.neon-cyan { color: var(--neon); }
+.glow-cyan { box-shadow: none; }
+
+/* Gentle status dot — soft opacity breathe, no expanding ring */
+.pulse-dot {
+  animation: hud-pulse 2.6s ease-in-out infinite;
+}
+@keyframes hud-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* --- Custom scrollbars --- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(150, 170, 190, 0.28) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(150, 170, 190, 0.22);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(150, 170, 190, 0.4); }
+
+/* Date/number inputs readable on dark */
+input[type="month"], input[type="week"], input[type="number"] {
+  color-scheme: dark;
+}

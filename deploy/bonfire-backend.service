@@ -1,0 +1,29 @@
+[Unit]
+Description=Bonfire - FastAPI backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/bonfire/backend
+# Binds the LAN interface so your phone can reach the API over WiFi —
+# intentional for this trusted-LAN deployment (see README "Security & scope").
+ExecStart=/home/pi/bonfire/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+
+# Hardening — check with: systemd-analyze security bonfire-backend.service
+# (ProtectHome=read-only, not =yes: the app lives under /home/pi and
+# ReadWritePaths cannot punch through ProtectHome=yes.)
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/home/pi/bonfire/backend/data
+
+[Install]
+WantedBy=multi-user.target

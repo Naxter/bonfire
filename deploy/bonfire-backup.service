@@ -1,0 +1,18 @@
+[Unit]
+Description=Bonfire - back up the SQLite database
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/bonfire/backend
+ExecStart=/home/pi/bonfire/venv/bin/python backup_db.py
+
+# Hardening — check with: systemd-analyze security bonfire-backup.service
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/home/pi/bonfire/backend/data

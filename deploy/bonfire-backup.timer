@@ -1,0 +1,10 @@
+[Unit]
+Description=Bonfire - daily SQLite backup
+
+[Timer]
+# Every night at 03:30; catches up after downtime (Persistent).
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

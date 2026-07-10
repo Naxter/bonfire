@@ -1,0 +1,25 @@
+[Unit]
+Description=Bonfire - Telegram bot (photo intake, restock, budget, meals, ask)
+After=network-online.target bonfire-backend.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/bonfire/backend
+ExecStart=/home/pi/bonfire/venv/bin/python telegram_bot.py
+Restart=on-failure
+RestartSec=5
+
+# Hardening — check with: systemd-analyze security bonfire-telegram.service
+# (No ReadWritePaths: the bot writes nothing; it talks to the API over HTTP.)
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
