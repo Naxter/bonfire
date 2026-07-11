@@ -14,6 +14,10 @@ updates:
       # Next 16.2 — revisit once Next supports it.
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]
+      # eslint-config-next (16.2.x) bundles an eslint-plugin-react that still
+      # uses ESLint 9's rule-context API; ESLint 10 crashes on it.
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: pip
     directory: /backend

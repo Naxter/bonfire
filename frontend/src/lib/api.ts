@@ -12,15 +12,27 @@ export const getStores = async () => {
     return response.data as { key: string; display_name: string }[];
 };
 
+export interface DashboardStats {
+    current_month_total: number;
+    previous_month_total: number;
+    diff_percent: number;
+}
+
 // Add the store parameter to your existing functions
 export const getDashboardStats = async (store: string = "all") => {
     const response = await api.get(`/stats/dashboard?store=${store}`);
-    return response.data;
+    return response.data as DashboardStats;
 };
+
+// One row per month; every other key is a store display name mapped to € spent.
+export interface MonthlyRow {
+    month: string;
+    [store: string]: number | string;
+}
 
 export const getMonthlyData = async (store: string = "all") => {
   const response = await api.get(`/stats/monthly?store=${store}`);
-  return response.data;
+  return response.data as MonthlyRow[];
 };
 
 // A shared time range (ISO YYYY-MM-DD strings, end-exclusive) plus store.
@@ -30,17 +42,39 @@ export interface RangeFilter {
   end?: string;
 }
 
+export interface CategorySpend {
+  name: string;
+  value: number;
+}
+
 export const getCategoryData = async ({ store = "all", start, end }: RangeFilter = {}) => {
   const p = new URLSearchParams({ store });
   if (start) p.set("start", start);
   if (end) p.set("end", end);
   const response = await api.get(`/stats/category?${p.toString()}`);
-  return response.data;
+  return response.data as CategorySpend[];
 };
 
 export interface ReceiptFilters extends RangeFilter {
   search?: string;
   category?: string;
+}
+
+// Mirrors ReceiptPublic in backend/app/main.py; dates arrive as ISO strings.
+export interface Receipt {
+  id: number;
+  store_name: string;
+  store_key: string;
+  store_address: string | null;
+  date: string;
+  total_amount: number;
+  currency: string;
+  pdf_filename: string;
+}
+
+export interface ReceiptsPage {
+  items: Receipt[];
+  total: number;
 }
 
 export const getReceiptsList = async (page: number, limit: number, f: ReceiptFilters = {}) => {
@@ -50,7 +84,7 @@ export const getReceiptsList = async (page: number, limit: number, f: ReceiptFil
   if (f.end) p.set("end", f.end);
   if (f.category && f.category !== "all") p.set("category", f.category);
   const response = await api.get(`/receipts?${p.toString()}`);
-  return response.data;
+  return response.data as ReceiptsPage;
 };
 
 export const getCategories = async () => {
@@ -58,15 +92,47 @@ export const getCategories = async () => {
   return response.data as string[];
 };
 
+export interface ReceiptItem {
+    id: number;
+    receipt_id: number;
+    product_id: number | null;
+    name: string;
+    clean_name: string;
+    category: string;
+    price_total: number;
+    price_single: number | null;
+    quantity: number;
+    tax_rate: string | null;
+    is_discounted: boolean;
+    loyalty_qualified: boolean;
+}
+
+export interface ReceiptDetails {
+    receipt: Receipt;
+    items: ReceiptItem[];
+}
+
 export const getReceiptDetails = async (id: number) => {
     const response = await api.get(`/receipts/${id}`);
-    return response.data;
+    return response.data as ReceiptDetails;
 };
+
+export interface CategoryUpdateResult {
+    status: string;
+    updated_items: number;
+    category: string;
+}
 
 export const updateItemCategory = async (itemName: string, newCategory: string) => {
     const response = await api.put(`/categories/update?item_name=${encodeURIComponent(itemName)}&new_category=${encodeURIComponent(newCategory)}`);
-    return response.data;
+    return response.data as CategoryUpdateResult;
 };
+
+export interface TopProduct {
+    name: string;
+    quantity: number;
+    store: string;
+}
 
 export const getTopProducts = async ({ store = "all", start, end, category }: ReceiptFilters = {}) => {
     const p = new URLSearchParams({ store });
@@ -74,22 +140,42 @@ export const getTopProducts = async ({ store = "all", start, end, category }: Re
     if (end) p.set("end", end);
     if (category && category !== "all") p.set("category", category);
     const response = await api.get(`/stats/top-products?${p.toString()}`);
-    return response.data;
+    return response.data as TopProduct[];
 };
+
+export interface VolatileItem {
+    name: string;
+    min_price: number;
+    max_price: number;
+    change_percent: number;
+    times_bought: number;
+    store: string;
+}
 
 export const getPriceVolatility = async (store: string = "all") => {
     const response = await api.get(`/stats/price-volatility?store=${store}`);
-    return response.data;
+    return response.data as VolatileItem[];
 };
+
+export interface PricePoint {
+    date: string;
+    exact_date: string;
+    price: number;
+}
 
 export const getPriceHistory = async (itemName: string, store: string = "all") => {
   const response = await api.get(`/stats/price-history?item_name=${encodeURIComponent(itemName)}&store=${store}`);
-  return response.data;
+  return response.data as PricePoint[];
 };
+
+export interface WalletShare {
+    name: string;
+    value: number;
+}
 
 export const getWalletShare = async () => {
     const response = await api.get('/stats/wallet-share');
-    return response.data;
+    return response.data as WalletShare[];
 };
 
 export interface Health {

@@ -53,7 +53,7 @@ function recentMonths(count = 24): { value: string; label: string }[] {
 export const DEFAULT_RANGE: Range = { key: "all", label: "All time" }
 
 export function TimeRange({ value, onChange }: { value: Range; onChange: (r: Range) => void }) {
-  const ranges = useMemo(buildRanges, [])
+  const ranges = useMemo(() => buildRanges(), [])
   const months = useMemo(() => recentMonths(24), [])
   const monthValue = value.key.startsWith("custom:") ? value.key.slice("custom:".length) : ""
 

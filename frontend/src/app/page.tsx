@@ -19,7 +19,9 @@ import {
     getCategoryData,
     getTopProducts,
     getPriceVolatility,
-    getPriceHistory, getWalletShare, getStores, getHealth, type Health
+    getPriceHistory, getWalletShare, getStores, getHealth, type Health,
+    type DashboardStats, type MonthlyRow, type CategorySpend, type TopProduct,
+    type VolatileItem, type PricePoint, type WalletShare
 } from "@/lib/api"
 import Image from "next/image"
 import {
@@ -30,17 +32,35 @@ import {
 import {LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer} from "recharts"
 import {storeColor, registerStores, CHART} from "@/lib/theme"
 
+// Custom Tooltip for the Price Line Chart
+interface PriceTooltipProps {
+    active?: boolean
+    payload?: { value: number; payload: PricePoint }[]
+}
+
+const PriceTooltip = ({active, payload}: PriceTooltipProps) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="rounded-lg border border-border bg-popover/95 p-3 shadow-[0_8px_24px_-10px_rgba(0,0,0,0.6)] backdrop-blur">
+                <p className="text-sm font-semibold mb-1">{payload[0].payload.exact_date}</p>
+                <p className="text-sm neon-text font-bold">€{payload[0].value.toFixed(2)}</p>
+            </div>
+        )
+    }
+    return null
+}
+
 export default function DashboardPage() {
     // --- State ---
-    const [stats, setStats] = useState<any>(null)
-    const [monthlyData, setMonthlyData] = useState([])
-    const [categoryData, setCategoryData] = useState([])
-    const [topProducts, setTopProducts] = useState<any[]>([])
+    const [stats, setStats] = useState<DashboardStats | null>(null)
+    const [monthlyData, setMonthlyData] = useState<MonthlyRow[]>([])
+    const [categoryData, setCategoryData] = useState<CategorySpend[]>([])
+    const [topProducts, setTopProducts] = useState<TopProduct[]>([])
 
     // Price Volatility & History State
-    const [volatilityData, setVolatilityData] = useState<any[]>([])
+    const [volatilityData, setVolatilityData] = useState<VolatileItem[]>([])
     const [selectedItem, setSelectedItem] = useState<string | null>(null)
-    const [priceHistoryData, setPriceHistoryData] = useState<any[]>([])
+    const [priceHistoryData, setPriceHistoryData] = useState<PricePoint[]>([])
 
     // Global filters
     const [globalStore, setGlobalStore] = useState("all")
@@ -51,7 +71,7 @@ export default function DashboardPage() {
     const [prodQuery, setProdQuery] = useState("")
     const [volaQuery, setVolaQuery] = useState("")
 
-    const [walletShareData, setWalletShareData] = useState<any[]>([])
+    const [walletShareData, setWalletShareData] = useState<WalletShare[]>([])
     const [stores, setStores] = useState<{ key: string; display_name: string }[]>([])
     const [health, setHealth] = useState<Health | null>(null)
 
@@ -116,11 +136,10 @@ export default function DashboardPage() {
     }, [globalStore, range.start, range.end, category])
 
     // --- Price History Load ---
+    // No reset needed when nothing is selected: the only place selectedItem
+    // becomes null is loadGlobalData, which clears the history itself.
     useEffect(() => {
-        if (!selectedItem) {
-            setPriceHistoryData([])
-            return
-        }
+        if (!selectedItem) return
         const fetchHistory = async () => {
             try {
                 const res = await getPriceHistory(selectedItem, globalStore)
@@ -159,22 +178,9 @@ export default function DashboardPage() {
     )
 
     const biggestHike = volatilityData.length > 0 ? volatilityData[0] : null
-    const allTimeSpend = walletShareData.reduce((s: number, x: any) => s + (x.value || 0), 0)
+    const allTimeSpend = walletShareData.reduce((s, x) => s + (x.value || 0), 0)
     const shareColor = storeColor
     const up = stats.diff_percent >= 0
-
-    // Custom Tooltip for the Price Line Chart
-    const PriceTooltip = ({active, payload}: any) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="rounded-lg border border-border bg-popover/95 p-3 shadow-[0_8px_24px_-10px_rgba(0,0,0,0.6)] backdrop-blur">
-                    <p className="text-sm font-semibold mb-1">{payload[0].payload.exact_date}</p>
-                    <p className="text-sm neon-text font-bold">€{payload[0].value.toFixed(2)}</p>
-                </div>
-            )
-        }
-        return null
-    }
 
     return (
         <div className="flex min-h-screen flex-col">
@@ -326,7 +332,7 @@ export default function DashboardPage() {
                             <span className="hud-label">Wallet share</span>
                         </div>
                         <div className="flex h-3 w-full overflow-hidden rounded-full border border-border bg-secondary/40">
-                            {walletShareData.map((s: any, i: number) => {
+                            {walletShareData.map((s, i) => {
                                 const pct = allTimeSpend ? (s.value / allTimeSpend) * 100 : 0
                                 const c = shareColor(s.name, i)
                                 return (
@@ -335,7 +341,7 @@ export default function DashboardPage() {
                             })}
                         </div>
                         <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-                            {walletShareData.map((s: any, i: number) => {
+                            {walletShareData.map((s, i) => {
                                 const pct = allTimeSpend ? (s.value / allTimeSpend) * 100 : 0
                                 const c = shareColor(s.name, i)
                                 return (
@@ -377,7 +383,7 @@ export default function DashboardPage() {
                             <div className="flex-1 overflow-y-auto min-h-0 p-1.5">
                                 {filteredVolatility.length === 0 ? (
                                     <div className="py-10 text-center text-xs text-muted-foreground">No items match.</div>
-                                ) : filteredVolatility.map((item: any, index: number) => {
+                                ) : filteredVolatility.map((item, index) => {
                                     const active = selectedItem === item.name
                                     return (
                                         <div
@@ -495,7 +501,7 @@ export default function DashboardPage() {
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {filteredProducts.map((item: any, index: number) => (
+                                            {filteredProducts.map((item, index) => (
                                                 <TableRow key={index} className="border-border/60 hover:bg-secondary/40">
                                                     <TableCell className="font-medium text-sm flex items-center gap-2">
                                                         {item.name}

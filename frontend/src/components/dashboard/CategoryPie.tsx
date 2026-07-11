@@ -2,8 +2,15 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { categoryColor, CHART } from "@/lib/theme";
+import type { CategorySpend } from "@/lib/api";
 
-const CustomTooltip = ({ active, payload }: any) => {
+interface CustomTooltipProps {
+  active?: boolean;
+  // recharts merges the Cell's fill into the hovered slice's datum
+  payload?: { payload: CategorySpend & { fill?: string } }[];
+}
+
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
@@ -18,7 +25,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 };
 
 interface CategoryPieProps {
-  data: any[];
+  data: CategorySpend[];
   activeCategory?: string | null;
   onSelect?: (name: string) => void;
 }
@@ -51,7 +58,7 @@ export function CategoryPie({ data, activeCategory = null, onSelect }: CategoryP
               nameKey="name"
               strokeWidth={2}
               stroke={CHART.pieStroke}
-              onClick={onSelect ? (entry: any) => onSelect(entry.name) : undefined}
+              onClick={onSelect ? (slice) => slice.name && onSelect(String(slice.name)) : undefined}
             >
               {data.map((entry, index) => {
                 const sliceColor = categoryColor(entry.name, index);

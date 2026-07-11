@@ -2,10 +2,17 @@
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts"
 import { storeColor, CHART } from "@/lib/theme"
+import type { MonthlyRow } from "@/lib/api"
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+interface CustomTooltipProps {
+  active?: boolean
+  payload?: { name: string; value: number; color?: string }[]
+  label?: string
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
-    const total = payload.reduce((sum: number, entry: any) => sum + entry.value, 0);
+    const total = payload.reduce((sum, entry) => sum + entry.value, 0);
     return (
       <div className="rounded-lg border border-border bg-popover/95 p-3 shadow-[0_8px_24px_-10px_rgba(0,0,0,0.6)] backdrop-blur min-w-[150px]">
         <div className="flex flex-col mb-2 border-b border-border pb-2">
@@ -13,7 +20,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           <span className="font-bold text-foreground">{label}</span>
         </div>
         <div className="space-y-1.5">
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry, index) => (
             <div key={index} className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-[2px]" style={{ backgroundColor: entry.color }} />
@@ -35,7 +42,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null
 }
 
-export function OverviewChart({ data }: { data: any[] }) {
+export function OverviewChart({ data }: { data: MonthlyRow[] }) {
   const seriesKeys = Array.from(
     new Set(data.flatMap((row) => Object.keys(row).filter((k) => k !== "month")))
   )

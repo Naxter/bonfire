@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
+import axios from "axios"
 import { uploadReceiptImage } from "@/lib/api"
 import { Camera } from "lucide-react"
 import { toast } from "sonner"
@@ -23,9 +24,9 @@ export function UploadReceiptButton() {
       }
       // let the dashboard reflect the new receipt
       setTimeout(() => window.location.reload(), 1200)
-    } catch (err: any) {
-      const msg = err?.response?.data?.detail || "Couldn't read a receipt from that image."
-      toast.error(msg, { id })
+    } catch (err) {
+      const data = axios.isAxiosError(err) ? (err.response?.data as { detail?: string } | undefined) : undefined
+      toast.error(data?.detail || "Couldn't read a receipt from that image.", { id })
     } finally {
       setBusy(false)
       if (inputRef.current) inputRef.current.value = ""
