@@ -12,11 +12,10 @@ rewe-ebon-parser>=0.0.8,<0.1  # REWE eBon PDFs (upstream is still 0.x — no 1.0
 
 # --- Ingest + integrations ---
 watchdog>=4.0               # inbox folder watcher (PDFs and photos)
-requests>=2.31              # Telegram bot + DM scraper
+requests>=2.31              # Telegram bot
 
 # --- email-scraper/ (run by the scrape timer / container) ---
-loguru>=0.7                 # scraper.py, dm_scraper.py
-beautifulsoup4>=4.12        # dm_scraper.py
+loguru>=0.7                 # scraper.py
 
 # --- LLM providers ---
 # Only the active one is imported at runtime. It's auto-detected from whichever

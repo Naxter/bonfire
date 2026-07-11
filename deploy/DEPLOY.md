@@ -70,8 +70,8 @@ config. (Set `LLM_PROVIDER=ollama` only if you want the local model instead.)
 Also fill in `GMX_USER` / `GMX_PASSWORD` / `REWE_SENDER` for the email scraper,
 and set `FRONTEND_ORIGINS=http://<pi-ip>:3000` so the browser can reach the API.
 
-> On the Pi you do **not** need `DM_BEARER_TOKEN` or `dm.html` — DM receipts are
-> handled by manually dropping their PDFs into the inbox (see step 6).
+> DM needs no configuration — DM receipts are handled by manually dropping
+> their PDFs into the inbox (see step 6).
 
 ## 4. Frontend (production build)
 

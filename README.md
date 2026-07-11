@@ -54,7 +54,7 @@ a Raspberry Pi.
 ## How it works
 
 ```
-email-scraper/   -> downloads receipt PDFs (REWE via IMAP, DM via API)
+email-scraper/   -> downloads REWE eBon PDFs from your mailbox (IMAP)
         |
         v
 backend/data/inbox/*.pdf|*.jpg
@@ -105,8 +105,9 @@ Open http://localhost:3000 and you get the dashboard above. Delete
    and files are ingested the moment they land.
 3. **Automate REWE:** forward your eBon mails to a mailbox the scraper can
    read (GMX credentials in `.env`), then run `email-scraper/scraper.py` on a
-   schedule. DM eBons can be fetched with `email-scraper/dm_scraper.py` or
-   dropped in manually.
+   schedule. DM offers no comparable automation — download the eBon PDF from
+   the DM app/website (or photograph the paper receipt) and drop it into
+   `backend/data/inbox/dm/`.
 
 ## Adding a new store
 
