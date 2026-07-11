@@ -46,10 +46,10 @@ a Raspberry Pi.
 - **Ask your groceries** — natural-language questions ("how much did I spend
   on drinks last month?") become guarded, read-only SQL.
 - **Meal ideas** — recipe suggestions from what's already in the house
-  (your latest shopping trip per store), with cooking time, what's still
-  missing, and 1-year-old adaptations. The prompts behind the built-in
-  adult / toddler / family profiles are editable, and you can add your own
-  profiles right in the dashboard.
+  (your latest shopping trip per store), with cooking time and what's still
+  missing. Suggestions are driven by meal profiles whose prompts you edit —
+  or create from scratch — right in the dashboard, so diets, allergies, or
+  household quirks live in your data, not in the code.
 - **Telegram bot** — snap a photo of a receipt to file it; `/restock`,
   `/budget`, `/meals`, or plain-language questions from your phone.
 - **Pluggable LLM** — Ollama (local), OpenAI, or Gemini. Drop an API key in

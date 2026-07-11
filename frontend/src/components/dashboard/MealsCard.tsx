@@ -112,9 +112,6 @@ export function MealsCard() {
   }
 
   const currentProfile = profiles.find((p) => p.key === profileKey)
-  const showBabyDisclaimer =
-    ["toddler", "family"].includes(profileKey) ||
-    (result?.meals ?? []).some((m) => m.baby_adaptation)
 
   const chip = (active: boolean, onClick: () => void, label: string, title?: string) => (
     <button
@@ -260,18 +257,13 @@ export function MealsCard() {
                   </div>
                 )}
                 {m.note && <div className="mt-1 text-xs text-muted-foreground/80">{m.note}</div>}
-                {m.baby_adaptation && (
+                {m.adaptation && (
                   <div className="mt-1 text-xs italic text-muted-foreground/80">
-                    For the little one: {m.baby_adaptation}
+                    {m.adaptation}
                   </div>
                 )}
               </div>
             ))}
-            {showBabyDisclaimer && (
-              <p className="pt-1 text-[11px] leading-snug text-muted-foreground/70 sm:col-span-2">
-                General guidance for a 1-year-old — always supervise meals, check textures to avoid choking, and watch for allergies. Not medical advice.
-              </p>
-            )}
           </div>
         )}
       </div>

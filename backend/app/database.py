@@ -104,14 +104,25 @@ def seed_categories():
 
 
 def seed_meal_profiles():
-    """Insert missing built-in meal profiles (never overwrites user edits)."""
+    """Insert missing built-in meal profiles (never overwrites user edits).
+
+    Profiles that were seeded as built-ins by an older version but are no
+    longer shipped get demoted to regular user profiles: the row (and any
+    edits) survives, it just becomes editable/deletable like any other."""
     with Session(engine) as session:
-        existing = {p.key for p in session.exec(select(MealProfile)).all()}
-        missing = [key for key in BUILTIN_MEAL_PROFILES if key not in existing]
-        for key in missing:
-            name, prompt = BUILTIN_MEAL_PROFILES[key]
-            session.add(MealProfile(key=key, name=name, prompt=prompt, is_builtin=True))
-        if missing:
+        rows = session.exec(select(MealProfile)).all()
+        existing = {p.key for p in rows}
+        changed = False
+        for key in BUILTIN_MEAL_PROFILES:
+            if key not in existing:
+                name, prompt = BUILTIN_MEAL_PROFILES[key]
+                session.add(MealProfile(key=key, name=name, prompt=prompt, is_builtin=True))
+                changed = True
+        for row in rows:
+            if row.is_builtin and row.key not in BUILTIN_MEAL_PROFILES:
+                row.is_builtin = False
+                changed = True
+        if changed:
             session.commit()
 
 

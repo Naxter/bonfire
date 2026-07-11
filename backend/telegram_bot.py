@@ -43,7 +43,7 @@ HELP = (
     "• Send a photo of any receipt → I'll add it\n"
     "• /restock — what's running low\n"
     "• /budget — this month's spend forecast\n"
-    "• /meals — dinner ideas (try /meals toddler or /meals family)\n"
+    "• /meals — dinner ideas (any profile key works, e.g. /meals family)\n"
     "• Ask anything, e.g. \"how much on drinks last month?\""
 )
 
@@ -136,9 +136,9 @@ def cmd_meals(chat_id, profile: str = "family") -> None:
         note = m.get("note")
         if note:
             lines.append(f"   ↳ {note}")
-        baby = m.get("baby_adaptation")
-        if baby:
-            lines.append(f"   👶 {baby}")
+        adaptation = m.get("adaptation")
+        if adaptation:
+            lines.append(f"   ↳ {adaptation}")
     send(chat_id, "\n".join(lines))
 
 

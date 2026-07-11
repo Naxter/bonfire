@@ -283,7 +283,7 @@ Grocery items bought recently ({ctx["label"]}) — raw receipt names, interpret 
 (fresh produce, meat, dairy). Suggest {count} meals. Return ONLY JSON:
 {{"meals": [{{"title": "...", "time_minutes": 25, "uses": ["items from the list above"],
 "missing": ["ingredients still needed, [] if none"], "note": "one or two short lines",
-"baby_adaptation": "how to adapt for a 1-year-old, or null when not applicable"}}]}}
+"adaptation": "how to adapt the meal to the profile's requirements, or null when not applicable"}}]}}
 """
     try:
         data = extract_json_object(complete(prompt, temperature=0.4))

@@ -216,7 +216,7 @@ export const getBudget = async () => {
 
 export interface Meal {
     title: string; uses: string[]; missing?: string[];
-    time_minutes?: number; note?: string; baby_adaptation?: string | null;
+    time_minutes?: number; note?: string; adaptation?: string | null;
 }
 export interface MealOptions {
     profile?: string; quick?: boolean; vegetarian?: boolean;

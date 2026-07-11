@@ -56,9 +56,9 @@ REWE_PRODUCTS = {
 }
 
 DM_PRODUCTS = {
-    "Windeln Gr. 4 40er": ("Drogerie & Kosmetik", 9.95),
-    "Feuchttücher 4er": ("Drogerie & Kosmetik", 3.95),
-    "Babybrei Pastinake": ("Drogerie & Kosmetik", 1.15),
+    "Duschgel Sensitive": ("Drogerie & Kosmetik", 1.95),
+    "Sonnencreme LSF 50": ("Drogerie & Kosmetik", 6.45),
+    "Vitamintabletten": ("Drogerie & Kosmetik", 3.15),
     "Shampoo sensitiv": ("Drogerie & Kosmetik", 2.45),
     "Zahnpasta": ("Drogerie & Kosmetik", 1.75),
     "Handseife Nachfüller": ("Drogerie & Kosmetik", 1.95),
