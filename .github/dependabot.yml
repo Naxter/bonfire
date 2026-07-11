@@ -1,0 +1,24 @@
+version: 2
+updates:
+  # Grouped monthly version bumps keep PR noise low; security updates are
+  # opened immediately regardless of this schedule.
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: monthly
+    groups:
+      npm-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: monthly
+    groups:
+      python-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
