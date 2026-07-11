@@ -12,6 +12,7 @@ any store, parses them into SQLite, categorizes every line item with an LLM,
 and serves analytics on a self-hosted dashboard — designed to run unattended on
 a Raspberry Pi.
 
+[![CI](https://github.com/Naxter/bonfire/actions/workflows/ci.yml/badge.svg)](https://github.com/Naxter/bonfire/actions/workflows/ci.yml)
 ![MIT license](https://img.shields.io/badge/license-MIT-green)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Node 18+](https://img.shields.io/badge/node-18%2B-brightgreen)
@@ -157,6 +158,11 @@ ruff check .                           # lint, config in pyproject.toml
 
 The database schema and lightweight migrations are applied automatically on
 API startup and by `process_backlog.py` — there is no migration tool to run.
+
+CI runs the same checks on every push and PR
+([.github/workflows/ci.yml](.github/workflows/ci.yml)). A self-hosted box can
+auto-deploy commits whose CI is green — see the CD section in
+[deploy/DOCKER.md](deploy/DOCKER.md).
 
 ## License
 

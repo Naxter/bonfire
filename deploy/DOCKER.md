@@ -73,6 +73,27 @@ docker compose logs -f telegram      # message the bot; it replies with your cha
 Put that id in `TELEGRAM_ALLOWED_CHAT_IDS`, then
 `docker compose --profile telegram up -d --force-recreate telegram`.
 
+## 4. Auto-deploy (optional CD)
+
+Let the box deploy itself: a systemd timer polls GitHub every 5 minutes and
+redeploys **only when the new commit's CI checks are green**, so a broken
+build never goes live. Nothing listens for inbound connections — the Pi only
+polls. (Deliberately not a self-hosted Actions runner: GitHub advises against
+those on public repositories.)
+
+```bash
+sudo cp deploy/bonfire-deploy.service deploy/bonfire-deploy.timer /etc/systemd/system/
+# Adjust if your clone isn't /home/pi/bonfire:
+sudo sed -i 's#/home/pi/bonfire#/home/YOU/bonfire#g; s/^User=pi/User=YOU/' \
+    /etc/systemd/system/bonfire-deploy.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now bonfire-deploy.timer
+
+journalctl -u bonfire-deploy.service -f    # watch deploys happen
+```
+
+To deploy immediately instead of waiting for the timer: `./deploy/update.sh`.
+
 ---
 
 ## Where your data lives

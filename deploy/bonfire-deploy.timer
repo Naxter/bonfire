@@ -1,0 +1,10 @@
+[Unit]
+Description=Bonfire - check for new green-CI commits every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

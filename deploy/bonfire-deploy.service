@@ -1,0 +1,10 @@
+[Unit]
+Description=Bonfire - deploy new green-CI commits (Docker Compose)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/bonfire
+ExecStart=/home/pi/bonfire/deploy/update.sh
