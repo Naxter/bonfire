@@ -12,7 +12,7 @@ export function RestockCard() {
   }, [])
 
   return (
-    <div className="hud-panel flex h-[360px] flex-col overflow-hidden">
+    <div className="hud-panel flex h-[420px] flex-col overflow-hidden">
       <div className="flex items-center gap-2 border-b border-border p-4">
         <ShoppingCart className="h-4 w-4 text-primary" />
         <div className="font-display text-sm font-bold tracking-wide text-foreground">RESTOCK RADAR</div>

@@ -14,7 +14,7 @@ export function BudgetCard() {
   const dayFrac = b ? Math.min(b.days_elapsed / b.days_in_month, 1) : 0
 
   return (
-    <div className="hud-panel flex h-[360px] flex-col overflow-hidden">
+    <div className="hud-panel flex h-[420px] flex-col overflow-hidden">
       <div className="flex items-center gap-2 border-b border-border p-4">
         <Wallet className="h-4 w-4 text-primary" />
         <div className="font-display text-sm font-bold tracking-wide text-foreground">BUDGET FORECAST</div>

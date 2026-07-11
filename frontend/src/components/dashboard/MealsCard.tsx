@@ -130,7 +130,7 @@ export function MealsCard() {
   )
 
   return (
-    <div className="hud-panel flex h-[360px] flex-col overflow-hidden">
+    <div className="hud-panel flex h-[420px] flex-col overflow-hidden">
       <div className="flex items-center justify-between gap-2 border-b border-border p-4">
         <div className="flex items-center gap-2">
           <UtensilsCrossed className="h-4 w-4 text-primary" />
@@ -239,7 +239,7 @@ export function MealsCard() {
         )}
 
         {ui === "done" && result?.status === "ok" && result.meals.length > 0 && (
-          <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {result.meals.map((m, i) => (
               <div key={i} className="rounded-md bg-secondary/30 p-3">
                 <div className="flex items-baseline justify-between gap-2">
@@ -268,7 +268,7 @@ export function MealsCard() {
               </div>
             ))}
             {showBabyDisclaimer && (
-              <p className="pt-1 text-[11px] leading-snug text-muted-foreground/70">
+              <p className="pt-1 text-[11px] leading-snug text-muted-foreground/70 sm:col-span-2">
                 General guidance for a 1-year-old — always supervise meals, check textures to avoid choking, and watch for allergies. Not medical advice.
               </p>
             )}

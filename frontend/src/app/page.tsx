@@ -318,10 +318,13 @@ export default function DashboardPage() {
                 </div>
 
                 {/* ===== DAILY ASSISTANT ===== */}
-                <div className="grid gap-4 lg:grid-cols-3">
+                {/* Meals is the content-richest card: half the row on lg screens. */}
+                <div className="grid gap-4 lg:grid-cols-4">
                     <RestockCard/>
                     <BudgetCard/>
-                    <MealsCard/>
+                    <div className="lg:col-span-2">
+                        <MealsCard/>
+                    </div>
                 </div>
 
                 {/* ===== WALLET SHARE BAR ===== */}
