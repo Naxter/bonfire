@@ -151,7 +151,8 @@ LLM-backed ones need `LLM_PROVIDER` reachable:
   just drop an image into `backend/data/inbox/` — the watcher handles images too.
 - **Restock radar** → `GET /insights/restock` (predictive shopping list).
 - **Budget forecast** → `GET /insights/budget` (month-end projection + anomalies).
-- **Meal ideas** → `GET /insights/meals` (from recent purchases).
+- **Meal ideas** → `GET /insights/meals` (from your latest shopping trips;
+  the prompt profiles are editable via `/meal-profiles` or the dashboard).
 - **Ask anything** → `GET /ask?q=...` (natural language → guarded read-only SQL).
 
 **Telegram bot setup:**

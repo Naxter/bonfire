@@ -5,7 +5,8 @@ from sqlalchemy import event, inspect, text
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from .categories import DEFAULT_SEED
-from .models import CategoryMap, Item, Product
+from .meal_profiles import BUILTIN_MEAL_PROFILES
+from .models import CategoryMap, Item, MealProfile, Product
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
     _run_migrations()
     seed_categories()
+    seed_meal_profiles()
     _backfill_products()
 
 
@@ -99,6 +101,18 @@ def seed_categories():
         for name, cat in DEFAULT_SEED.items():
             session.add(CategoryMap(item_key=name, category=cat, is_locked=False))
         session.commit()
+
+
+def seed_meal_profiles():
+    """Insert missing built-in meal profiles (never overwrites user edits)."""
+    with Session(engine) as session:
+        existing = {p.key for p in session.exec(select(MealProfile)).all()}
+        missing = [key for key in BUILTIN_MEAL_PROFILES if key not in existing]
+        for key in missing:
+            name, prompt = BUILTIN_MEAL_PROFILES[key]
+            session.add(MealProfile(key=key, name=name, prompt=prompt, is_builtin=True))
+        if missing:
+            session.commit()
 
 
 def _backfill_products():

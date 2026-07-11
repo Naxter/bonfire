@@ -44,8 +44,11 @@ a Raspberry Pi.
   hikes across your receipts.
 - **Ask your groceries** — natural-language questions ("how much did I spend
   on drinks last month?") become guarded, read-only SQL.
-- **Meal ideas** — recipe suggestions from what you actually bought, with
-  adult / toddler / family modes.
+- **Meal ideas** — recipe suggestions from what's already in the house
+  (your latest shopping trip per store), with cooking time, what's still
+  missing, and 1-year-old adaptations. The prompts behind the built-in
+  adult / toddler / family profiles are editable, and you can add your own
+  profiles right in the dashboard.
 - **Telegram bot** — snap a photo of a receipt to file it; `/restock`,
   `/budget`, `/meals`, or plain-language questions from your phone.
 - **Pluggable LLM** — Ollama (local), OpenAI, or Gemini. Drop an API key in

@@ -128,22 +128,53 @@ export const getBudget = async () => {
     return response.data as Budget;
 };
 
-export interface Meal { title: string; uses: string[]; note?: string }
-export interface MealOptions { audience?: string; quick?: boolean; vegetarian?: boolean; days?: number; count?: number }
+export interface Meal {
+    title: string; uses: string[]; missing?: string[];
+    time_minutes?: number; note?: string; baby_adaptation?: string | null;
+}
+export interface MealOptions {
+    profile?: string; quick?: boolean; vegetarian?: boolean;
+    context?: 'trip' | 'days'; days?: number; count?: number; avoid?: string[];
+}
+export interface MealsResponse {
+    status: 'ok' | 'llm_error' | 'no_ingredients';
+    ingredients: string[]; meals: Meal[];
+    profile?: { key: string; name: string };
+    context?: { mode: string; widened: boolean; label: string };
+}
 export const getMeals = async (opts: MealOptions = {}) => {
     const p = new URLSearchParams();
-    if (opts.audience) p.set('audience', opts.audience);
+    if (opts.profile) p.set('profile', opts.profile);
     if (opts.quick) p.set('quick', 'true');
     if (opts.vegetarian) p.set('vegetarian', 'true');
+    if (opts.context) p.set('context', opts.context);
     if (opts.days) p.set('days', String(opts.days));
     if (opts.count) p.set('count', String(opts.count));
+    for (const title of opts.avoid ?? []) p.append('avoid', title);
     const qs = p.toString();
     const response = await api.get(`/insights/meals${qs ? `?${qs}` : ''}`);
-    return response.data as { ingredients: string[]; meals: Meal[]; audience?: string };
+    return response.data as MealsResponse;
+};
+
+export interface MealProfile { id: number; key: string; name: string; prompt: string; is_builtin: boolean }
+export const getMealProfiles = async () => {
+    const response = await api.get('/meal-profiles');
+    return response.data as MealProfile[];
+};
+export const createMealProfile = async (name: string, prompt: string) => {
+    const response = await api.post('/meal-profiles', { name, prompt });
+    return response.data as MealProfile;
+};
+export const updateMealProfile = async (id: number, name: string, prompt: string) => {
+    const response = await api.put(`/meal-profiles/${id}`, { name, prompt });
+    return response.data as MealProfile;
+};
+export const deleteMealProfile = async (id: number) => {
+    await api.delete(`/meal-profiles/${id}`);
 };
 
 export interface AskResponse {
-    question: string; rows?: any[]; answer?: string | null; error?: string;
+    question: string; rows?: Record<string, unknown>[]; answer?: string | null; error?: string;
 }
 export const ask = async (q: string) => {
     const response = await api.get(`/ask?q=${encodeURIComponent(q)}`);

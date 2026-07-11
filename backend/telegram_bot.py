@@ -111,22 +111,34 @@ def cmd_budget(chat_id) -> None:
     send(chat_id, "\n".join(lines))
 
 
-def cmd_meals(chat_id, audience: str = "family") -> None:
+def cmd_meals(chat_id, profile: str = "family") -> None:
     send(chat_id, "🍝 Thinking…")
-    data = _api_get(f"/insights/meals?audience={audience}")
+    data = _api_get(f"/insights/meals?profile={requests.utils.quote(profile)}")
     meals = data.get("meals", [])
+    if data.get("status") == "llm_error":
+        send(chat_id, "❌ The meal helper didn't answer (LLM error). Try again in a minute.")
+        return
     if not meals:
         send(chat_id, "No meal ideas yet — buy some fresh stuff first!")
         return
-    labels = {"adult": "adults", "toddler": "your 1-year-old", "family": "the whole family"}
-    label = labels.get(audience, audience)
+    label = (data.get("profile") or {}).get("name", profile)
     lines = [f"🍝 Ideas for {label}:"]
     for m in meals:
+        title = m.get("title", "?")
+        minutes = m.get("time_minutes")
+        lines.append(f"• {title}" + (f" (~{minutes} min)" if minutes else ""))
         uses = ", ".join(m.get("uses", [])[:5])
-        lines.append(f"• {m.get('title', '?')}" + (f" — {uses}" if uses else ""))
+        if uses:
+            lines.append(f"   uses: {uses}")
+        missing = ", ".join(m.get("missing", [])[:4])
+        if missing:
+            lines.append(f"   still needed: {missing}")
         note = m.get("note")
         if note:
             lines.append(f"   ↳ {note}")
+        baby = m.get("baby_adaptation")
+        if baby:
+            lines.append(f"   👶 {baby}")
     send(chat_id, "\n".join(lines))
 
 
@@ -140,9 +152,10 @@ def handle_text(chat_id, text: str) -> None:
     elif low.startswith("/budget"):
         cmd_budget(chat_id)
     elif low.startswith("/meals"):
+        # Any word after /meals is a profile key (custom profiles included);
+        # the backend falls back to "adult" for unknown keys.
         parts = low.split()
-        audience = parts[1] if len(parts) > 1 and parts[1] in ("adult", "toddler", "family") else "family"
-        cmd_meals(chat_id, audience)
+        cmd_meals(chat_id, parts[1] if len(parts) > 1 else "family")
     else:
         send(chat_id, "🤔 Let me check…")
         res = _api_get(f"/ask?q={requests.utils.quote(t)}")

@@ -60,3 +60,15 @@ class CategoryMap(SQLModel, table=True):
     item_key: str = Field(primary_key=True)
     category: str
     is_locked: bool = Field(default=False)
+
+
+class MealProfile(SQLModel, table=True):
+    """A meal-suggestion persona: the user-editable instruction block of the
+    prompt. Built-ins (adult/toddler/family) are seeded at startup; their
+    prompts may be edited but they can't be deleted, and their keys stay
+    stable so the Telegram bot and existing URLs keep working."""
+    id: int | None = Field(default=None, primary_key=True)
+    key: str = Field(index=True, unique=True)
+    name: str
+    prompt: str
+    is_builtin: bool = False

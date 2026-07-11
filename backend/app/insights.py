@@ -23,7 +23,8 @@ from sqlmodel import Session, func, select
 
 from .database import SQLITE_PATH, engine
 from .llm import complete
-from .models import Item, Receipt
+from .meal_profiles import BUILTIN_MEAL_PROFILES
+from .models import Item, MealProfile, Receipt
 from .receipt_json import extract_json_object
 
 logger = logging.getLogger(__name__)
@@ -161,52 +162,102 @@ def budget_report(history_months: int = 6, anomaly_factor: float = 1.5) -> dict:
 # --------------------------------------------------------------------------- #
 # #6  Meal suggestions
 # --------------------------------------------------------------------------- #
-MEAL_AUDIENCES = ("adult", "toddler", "family")
-
-_AUDIENCE_BLOCK = {
-    "adult": "Suggest simple, tasty dinners for adults.",
-    "toddler": (
-        "Suggest meals suitable for a 1-year-old (12+ months). Follow these safety "
-        "rules STRICTLY:\n"
-        "- NO added salt and NO added sugar (a baby's kidneys can't handle much salt).\n"
-        "- No honey.\n"
-        "- Avoid choking hazards: quarter grapes and cherry tomatoes lengthwise, no "
-        "whole nuts (only smooth nut butter thinly spread), no hard raw chunks — cook "
-        "vegetables until soft.\n"
-        "- Soft, mashable or easy-to-chew, finger-food-friendly textures.\n"
-        "Favour iron-rich, nutrient-dense ingredients and keep it very simple. In each "
-        "meal's note, give a short prep/safety tip (texture, how to cut) and flag common "
-        "allergens (egg, dairy, wheat, nuts, fish) if the meal contains them."
-    ),
-    "family": (
-        "Suggest ONE meal the whole family can eat together, easily adapted for a "
-        "1-year-old. Cook once. For the baby's portion: set some aside BEFORE adding "
-        "salt, sugar or spicy seasoning, and mash or cut it into soft small pieces; "
-        "avoid choking hazards (quarter grapes/tomatoes, no whole nuts). In each meal's "
-        "note, explain briefly how to adapt that meal for the 1-year-old."
-    ),
-}
+# A lone top-up trip makes sad menus — widen the context below this many foods.
+_MIN_TRIP_ITEMS = 10
 
 
-def meal_suggestions(days: int = 10, count: int = 3, audience: str = "adult",
-                     quick: bool = False, vegetarian: bool = False, max_items: int = 60) -> dict:
-    """Ask the LLM for meals mostly using recently bought food items, tailored to
-    the chosen audience (adult / toddler / family) and optional constraints."""
-    audience = (audience or "adult").lower()
-    if audience not in MEAL_AUDIENCES:
-        audience = "adult"
-
-    since = datetime.now() - timedelta(days=days)
+def _resolve_profile(key: str) -> dict:
+    """Profile by key from the DB, falling back to the built-in definitions."""
+    key = (key or "adult").strip().lower()
     with Session(engine) as session:
-        rows = session.exec(
-            select(Item.name, Item.category).join(Receipt)
-            .where(Receipt.date >= since).distinct()
+        row = session.exec(select(MealProfile).where(MealProfile.key == key)).first()
+        if row is None:
+            row = session.exec(select(MealProfile).where(MealProfile.key == "adult")).first()
+    if row is not None:
+        return {"key": row.key, "name": row.name, "prompt": row.prompt}
+    name, prompt = BUILTIN_MEAL_PROFILES.get(key, BUILTIN_MEAL_PROFILES["adult"])
+    return {"key": key if key in BUILTIN_MEAL_PROFILES else "adult", "name": name, "prompt": prompt}
+
+
+def _collect_foods(rows) -> dict[str, datetime]:
+    """name -> newest purchase date, food items only."""
+    newest: dict[str, datetime] = {}
+    for name, cat, date in rows:
+        if cat in _NON_FOOD or cat == "Uncategorized":
+            continue
+        if name not in newest or date > newest[name]:
+            newest[name] = date
+    return newest
+
+
+def _meal_ingredients(context: str, days: int, max_items: int) -> tuple[list[str], dict]:
+    """Candidate ingredients plus a description of the context used.
+
+    ``trip``: the most recent shopping trip (latest receipt) of each store —
+    the closest model of "what's in the house", widened with a ``days``-day
+    window when the trips alone yield too few foods. ``days``: plain rolling
+    window. Items are recency-ordered before capping so a big pantry doesn't
+    get truncated alphabetically.
+    """
+    window_start = datetime.now() - timedelta(days=days)
+    with Session(engine) as session:
+        window_rows = session.exec(
+            select(Item.name, Item.category, Receipt.date).join(Receipt)
+            .where(Receipt.date >= window_start)
         ).all()
 
-    foods = [name for name, cat in rows if cat not in _NON_FOOD]
-    foods = sorted(set(foods))[:max_items]
+        trip_rows = []
+        if context == "trip":
+            last_per_store = (
+                select(Receipt.store_key, func.max(Receipt.date).label("last_date"))
+                .group_by(Receipt.store_key).subquery()
+            )
+            trip_rows = session.exec(
+                select(Item.name, Item.category, Receipt.date).join(Receipt).join(
+                    last_per_store,
+                    (Receipt.store_key == last_per_store.c.store_key)
+                    & (Receipt.date == last_per_store.c.last_date),
+                )
+            ).all()
+
+    if context == "trip":
+        newest = _collect_foods(trip_rows)
+        widened = len(newest) < _MIN_TRIP_ITEMS
+        if widened:
+            for name, date in _collect_foods(window_rows).items():
+                newest.setdefault(name, date)
+        label = "your latest shopping trip per store"
+        if widened:
+            label += f", widened to the last {days} days"
+        info = {"mode": "trip", "widened": widened, "label": label}
+    else:
+        newest = _collect_foods(window_rows)
+        info = {"mode": "days", "widened": False, "label": f"the last {days} days"}
+
+    foods = sorted(newest, key=newest.get, reverse=True)[:max_items]
+    return foods, info
+
+
+def meal_suggestions(profile: str = "adult", count: int = 3, quick: bool = False,
+                     vegetarian: bool = False, context: str = "trip", days: int = 14,
+                     avoid: list[str] | None = None, max_items: int = 60) -> dict:
+    """Ask the LLM for meals mostly using food that's already in the house.
+
+    ``profile`` selects a MealProfile (the persona/instruction block). The
+    scaffold around it — ingredients, constraints, output schema — stays
+    code-owned so user-edited prompts can't break response parsing.
+    ``status`` in the result distinguishes an LLM failure from a genuinely
+    empty pantry, so the UI never has to lie about why there are no meals.
+    """
+    count = max(1, min(int(count), 6))
+    if context not in ("trip", "days"):
+        context = "trip"
+    prof = _resolve_profile(profile)
+    foods, ctx = _meal_ingredients(context, days, max_items)
+    base = {"profile": {"key": prof["key"], "name": prof["name"]},
+            "context": ctx, "ingredients": foods}
     if not foods:
-        return {"ingredients": [], "meals": [], "audience": audience}
+        return {**base, "status": "no_ingredients", "meals": []}
 
     constraints = []
     if quick:
@@ -215,24 +266,32 @@ def meal_suggestions(days: int = 10, count: int = 3, audience: str = "adult",
         constraints.append("Every meal must be vegetarian (no meat, no fish).")
     constraint_line = (" ".join(constraints) + "\n") if constraints else ""
 
+    avoid_line = ""
+    if avoid:
+        titles = "; ".join(t.strip() for t in avoid if t.strip())[:600]
+        if titles:
+            avoid_line = f"The user has already seen these and wants DIFFERENT ideas: {titles}.\n"
+
     prompt = f"""
-You are a practical home-cooking assistant for a German household with a 1-year-old.
-Grocery items bought in the last {days} days:
+You are a practical home-cooking assistant for a German household.
+{prof["prompt"]}
+
+Grocery items bought recently ({ctx["label"]}) — raw receipt names, interpret them sensibly:
 {", ".join(foods)}
 
-{_AUDIENCE_BLOCK[audience]}
-{constraint_line}Prefer meals that mostly use the items above and use up perishables
+{constraint_line}{avoid_line}Prefer meals that mostly use the items above and use up perishables
 (fresh produce, meat, dairy). Suggest {count} meals. Return ONLY JSON:
-{{"meals": [{{"title": "...", "uses": ["item", "item"], "note": "one or two short lines"}}]}}
+{{"meals": [{{"title": "...", "time_minutes": 25, "uses": ["items from the list above"],
+"missing": ["ingredients still needed, [] if none"], "note": "one or two short lines",
+"baby_adaptation": "how to adapt for a 1-year-old, or null when not applicable"}}]}}
 """
     try:
-        data = extract_json_object(complete(prompt, temperature=0.3))
+        data = extract_json_object(complete(prompt, temperature=0.4))
         meals = data.get("meals", []) if isinstance(data, dict) else []
     except Exception as e:
         logger.error("Meal suggestion failed: %s", e)
-        meals = []
-
-    return {"ingredients": foods, "meals": meals, "audience": audience}
+        return {**base, "status": "llm_error", "meals": []}
+    return {**base, "status": "ok", "meals": meals[:count]}
 
 
 # --------------------------------------------------------------------------- #

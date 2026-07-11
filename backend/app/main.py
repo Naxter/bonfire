@@ -1,10 +1,11 @@
 import os
+import re
 import tempfile
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -18,7 +19,7 @@ from .categorizer import recategorize
 from .database import create_db_and_tables, engine, get_session
 from .insights import answer_question, budget_report, meal_suggestions, restock_report
 from .llm import resolve_provider_name
-from .models import CategoryMap, Item, Product, Receipt
+from .models import CategoryMap, Item, MealProfile, Product, Receipt
 from .stores import list_stores, store_display_name
 from .vision_ingest import IMAGE_EXTS, MAX_IMAGE_BYTES, process_image_file
 
@@ -46,7 +47,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type"],
 )
 
@@ -446,15 +447,79 @@ def get_budget():
 
 @app.get("/insights/meals")
 @limiter.limit("10/minute")
-def get_meals(request: Request, days: int = 10, count: int = 3, audience: str = "adult",
-              quick: bool = False, vegetarian: bool = False):
-    """LLM meal ideas from recently purchased ingredients.
+def get_meals(request: Request, profile: str = "adult", audience: str | None = None,
+              count: int = 3, quick: bool = False, vegetarian: bool = False,
+              context: str = "trip", days: int = 14,
+              avoid: list[str] = Query(default=[])):
+    """LLM meal ideas from food that's already in the house.
 
-    ``audience``: adult | toddler | family (1-year-old-safe). Optional ``quick``
-    (≤20 min) and ``vegetarian`` constraints.
+    ``profile`` is a MealProfile key (``audience`` is a legacy alias).
+    ``context``: "trip" (latest shopping trip per store, widened when thin)
+    or "days" (rolling window). ``avoid``: titles the user already saw, so a
+    refresh yields different ideas.
     """
-    return meal_suggestions(days=days, count=count, audience=audience,
-                            quick=quick, vegetarian=vegetarian)
+    return meal_suggestions(profile=audience or profile, count=count, quick=quick,
+                            vegetarian=vegetarian, context=context, days=days, avoid=avoid)
+
+
+class MealProfileIn(SQLModel):
+    name: str
+    prompt: str
+
+
+def _validated_profile_fields(data: MealProfileIn) -> tuple[str, str]:
+    name = (data.name or "").strip()
+    prompt = (data.prompt or "").strip()
+    if not name or len(name) > 60:
+        raise HTTPException(status_code=422, detail="Name must be 1-60 characters.")
+    if not prompt or len(prompt) > 4000:
+        raise HTTPException(status_code=422, detail="Prompt must be 1-4000 characters.")
+    return name, prompt
+
+
+@app.get("/meal-profiles")
+def list_meal_profiles(session: Session = Depends(get_session)):
+    """All meal profiles, built-ins first (stable id order)."""
+    return session.exec(select(MealProfile).order_by(MealProfile.id)).all()
+
+
+@app.post("/meal-profiles")
+def create_meal_profile(data: MealProfileIn, session: Session = Depends(get_session)):
+    name, prompt = _validated_profile_fields(data)
+    base = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "profile"
+    key, n = base, 2
+    while session.exec(select(MealProfile).where(MealProfile.key == key)).first():
+        key, n = f"{base}-{n}", n + 1
+    row = MealProfile(key=key, name=name, prompt=prompt, is_builtin=False)
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+@app.put("/meal-profiles/{profile_id}")
+def update_meal_profile(profile_id: int, data: MealProfileIn,
+                        session: Session = Depends(get_session)):
+    """Edit name/prompt. The key never changes (Telegram + URLs stay stable)."""
+    row = session.get(MealProfile, profile_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Profile not found.")
+    row.name, row.prompt = _validated_profile_fields(data)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+@app.delete("/meal-profiles/{profile_id}")
+def delete_meal_profile(profile_id: int, session: Session = Depends(get_session)):
+    row = session.get(MealProfile, profile_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Profile not found.")
+    if row.is_builtin:
+        raise HTTPException(status_code=400, detail="Built-in profiles cannot be deleted.")
+    session.delete(row)
+    session.commit()
+    return {"ok": True}
 
 
 @app.get("/ask")
