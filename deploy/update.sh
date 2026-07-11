@@ -20,15 +20,17 @@ if [ "$LOCAL" = "$REMOTE" ]; then
     exit 0
 fi
 
-# Require every CI check on the new commit to have succeeded (public repo,
-# so no token is needed). Pending or failed checks: try again next tick.
+# Require the CI workflow on the new commit to have succeeded (public repo,
+# so no token is needed). Gate on the CI workflow specifically — other apps
+# (e.g. Dependabot's own update jobs) attach unrelated check-runs to the same
+# commit, and their failures must not block a deploy.
 VERDICT=$(curl -sf --max-time 20 \
     -H "Accept: application/vnd.github+json" \
-    "https://api.github.com/repos/${REPO_SLUG}/commits/${REMOTE}/check-runs?filter=latest" \
+    "https://api.github.com/repos/${REPO_SLUG}/actions/runs?head_sha=${REMOTE}" \
     | python3 -c '
 import json, sys
-runs = json.load(sys.stdin).get("check_runs", [])
-ok = bool(runs) and all(r.get("conclusion") == "success" for r in runs)
+runs = [r for r in json.load(sys.stdin).get("workflow_runs", []) if r.get("name") == "CI"]
+ok = bool(runs) and runs[0].get("status") == "completed" and runs[0].get("conclusion") == "success"
 print("success" if ok else "not-ready")
 ') || VERDICT="not-ready"
 
