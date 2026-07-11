@@ -9,6 +9,11 @@ updates:
     groups:
       npm-dependencies:
         patterns: ["*"]
+    ignore:
+      # TypeScript 7 (the native compiler) breaks `next build`'s worker as of
+      # Next 16.2 — revisit once Next supports it.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: pip
     directory: /backend
