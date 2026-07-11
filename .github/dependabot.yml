@@ -9,6 +9,11 @@ updates:
     groups:
       npm-dependencies:
         patterns: ["*"]
+      # Security fixes land immediately (good) but as ONE PR, not one per
+      # advisory — most are transitive lockfile bumps anyway.
+      npm-security:
+        applies-to: security-updates
+        patterns: ["*"]
     ignore:
       # TypeScript 7 (the native compiler) breaks `next build`'s worker as of
       # Next 16.2 — revisit once Next supports it.
@@ -25,6 +30,9 @@ updates:
       interval: monthly
     groups:
       python-dependencies:
+        patterns: ["*"]
+      pip-security:
+        applies-to: security-updates
         patterns: ["*"]
 
   - package-ecosystem: github-actions
