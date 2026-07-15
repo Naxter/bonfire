@@ -171,17 +171,36 @@ def handle_text(chat_id, text: str) -> None:
 def main() -> None:
     if not TOKEN:
         raise SystemExit("Missing TELEGRAM_BOT_TOKEN. Create a bot via @BotFather and set it in .env.")
+
+    # Fail loudly on a bad token: Telegram answers ok=false to every call,
+    # which the poll loop would otherwise mistake for "no new messages".
+    try:
+        me = requests.get(f"{TG}/getMe", timeout=15).json()
+    except (requests.RequestException, ValueError):
+        me = None  # transient network problem — the poll loop retries anyway
+    if me is not None and not me.get("ok"):
+        raise SystemExit(
+            "Telegram rejected TELEGRAM_BOT_TOKEN (getMe failed) — "
+            "re-copy the token from @BotFather into .env and restart."
+        )
+    if me:
+        logger.info("Authenticated as @%s", me["result"]["username"])
     logger.info("Bot polling. Allowed chats: %s", ALLOWED or "(none set — will report chat ids)")
 
     offset = None
     while True:
         try:
             resp = requests.get(f"{TG}/getUpdates", params={"timeout": 30, "offset": offset}, timeout=40)
-            updates = resp.json().get("result", [])
+            data = resp.json()
         except (requests.RequestException, ValueError) as e:
             logger.warning("getUpdates error: %s", _redact(e))
             time.sleep(5)  # back off — don't busy-loop on a persistent failure
             continue
+        if not data.get("ok"):
+            logger.warning("getUpdates rejected: %s", data.get("description", "unknown reason"))
+            time.sleep(5)
+            continue
+        updates = data.get("result", [])
 
         for upd in updates:
             offset = upd["update_id"] + 1
