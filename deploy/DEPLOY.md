@@ -117,8 +117,9 @@ systemctl list-timers bonfire-rewe-scrape.timer
 
 ## 6. Day-to-day
 
-- **REWE:** nothing to do — the timer polls GMX hourly, drops PDFs into the
-  inbox, and the watcher ingests them.
+- **REWE:** nothing to do — the timer polls GMX daily, drops PDFs into the
+  inbox, and the watcher ingests them. Impatient? The dashboard's
+  "Fetch mails" button runs a sweep right now.
 - **DM:** save the eBon PDF into
   `backend/data/inbox/dm/` (via Samba, `scp`, a synced
   folder, etc.). The watcher picks it up within a couple of seconds, parses it,

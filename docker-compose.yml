@@ -56,12 +56,14 @@ services:
       WATCHER_POLLING: "1"
     command: python watch_inbox.py
 
-  # Pulls new REWE eBons from GMX on an interval (default hourly).
+  # Pulls new REWE eBons from GMX on an interval. Default: daily — groceries
+  # arrive once or twice a week, and the dashboard's "Fetch mails" button
+  # covers the impatient case. Override with SCRAPE_INTERVAL_SECONDS.
   scraper:
     <<: *backend
     container_name: bonfire-scraper
     working_dir: /app/email-scraper
-    command: sh -c 'while true; do python scraper.py || true; sleep ${SCRAPE_INTERVAL_SECONDS:-3600}; done'
+    command: sh -c 'while true; do python scraper.py || true; sleep ${SCRAPE_INTERVAL_SECONDS:-86400}; done'
 
   # Online SQLite snapshot on an interval (default daily), keeps BACKUP_KEEP copies.
   # Backup FIRST, then sleep — sleeping first meant no backup existed until 24h

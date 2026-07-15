@@ -50,7 +50,7 @@ docker compose logs -f watcher
 ```
 
 Services: `backend` (API), `frontend` (dashboard), `watcher` (ingests dropped
-receipts), `scraper` (hourly REWE fetch), `backup` (SQLite snapshot at start +
+receipts), `scraper` (daily REWE fetch), `backup` (SQLite snapshot at start +
 daily).
 
 Verify the LLM key works:

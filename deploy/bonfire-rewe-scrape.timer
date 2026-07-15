@@ -1,10 +1,12 @@
 [Unit]
-Description=Bonfire - poll GMX for new REWE eBons hourly
+Description=Bonfire - poll GMX for new REWE eBons daily
 
 [Timer]
-# Every hour, and shortly after boot. Catches up if the Pi was off (Persistent).
+# Daily, and shortly after boot. Catches up if the Pi was off (Persistent).
+# Groceries arrive once or twice a week; the dashboard's "Fetch mails"
+# button covers on-demand fetches in between.
 OnBootSec=3min
-OnUnitActiveSec=1h
+OnUnitActiveSec=24h
 Persistent=true
 
 [Install]
