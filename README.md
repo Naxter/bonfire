@@ -28,30 +28,51 @@ a Raspberry Pi.
 
 ## Features
 
-- **Automatic ingest** — an IMAP scraper pulls REWE eBon PDFs from your inbox
-  on a schedule; a folder watcher ingests anything you drop into
-  `backend/data/inbox/` (PDF or photo) within seconds.
+- **Automatic ingest with a visible lifecycle** — an IMAP scraper pulls REWE
+  eBon PDFs from your inbox on a schedule; a folder watcher ingests anything
+  you drop into `backend/data/inbox/` (PDF or photo) within seconds. Every
+  import is a tracked job: the dashboard shows queued/running/failed states,
+  keeps an import history, and failed files can be retried with one click.
 - **Any store via photos** — receipts from stores without an adapter
   (Aldi, Lidl, the bakery) are photographed and structured by a multimodal
-  LLM; new stores appear in the dashboard filter automatically.
+  LLM; new stores appear in the dashboard filter automatically. Drag-and-drop
+  PDFs/photos or use the mobile camera right from the Receipts page.
+- **Data you can trust** — every import is validated (line items must add up
+  to the printed total) and vision imports are flagged for review. The review
+  screen shows the archived original next to the parsed fields; store, date,
+  total and every line item are editable, receipts can be verified,
+  reprocessed from the source file, or deleted, and duplicate imports are
+  detected and resolvable.
 - **LLM categorization with a cache** — every line item is filed into a
   German grocery taxonomy once, then remembered. Manual overrides are locked
-  and never overwritten.
-- **Restock radar** — predicts what you're about to run out of, from your own
-  purchase cadence.
-- **Budget forecast** — projects month-end spend from the current pace and
-  flags categories running hot vs. their history.
+  and never overwritten — and when you change a category you choose whether
+  it applies everywhere or just to one receipt line.
+- **Restock radar with actions** — predicts what you're about to run out of
+  (with quantity suggestions) from your own purchase cadence; put it on the
+  shopping list, mark it bought, snooze it, or dismiss it for good.
+- **Shopping list & pantry** — a real shopping list (restock suggestions feed
+  it) and an optional pantry that meal ideas use once you maintain it.
+- **Budgets, not just forecasts** — monthly and per-category targets with
+  remaining amounts, overspend alerts, a month-end projection, and a
+  "what changed vs. last month?" breakdown.
+- **Product identity & price comparison** — receipt-name variants are merged
+  into canonical products with package sizes parsed from the names, so prices
+  compare as €/kg / €/l across pack sizes and stores. Price-jump alerts flag
+  items that suddenly got dearer.
 - **Inflation tracker** — per-product price history and the biggest price
   hikes across your receipts.
 - **Ask your groceries** — natural-language questions ("how much did I spend
   on drinks last month?") become guarded, read-only SQL.
 - **Meal ideas** — recipe suggestions from what's already in the house
-  (your latest shopping trip per store), with cooking time and what's still
-  missing. Suggestions are driven by meal profiles whose prompts you edit —
-  or create from scratch — right in the dashboard, so diets, allergies, or
-  household quirks live in your data, not in the code.
+  (your latest shopping trip per store, plus your pantry), with cooking time
+  and what's still missing. Suggestions are driven by meal profiles whose
+  prompts you edit — or create from scratch — right in the dashboard.
 - **Telegram bot** — snap a photo of a receipt to file it; `/restock`,
   `/budget`, `/meals`, or plain-language questions from your phone.
+- **German & English UI, three themes** — locale-aware dates and numbers,
+  dark/light/system plus a high-contrast theme.
+- **Your data stays portable** — one-click CSV/JSON export and a consistent
+  SQLite snapshot download, plus scheduled on-disk backups.
 - **Pluggable LLM** — Ollama (local), OpenAI, or Gemini. Drop an API key in
   `.env` and the provider is auto-detected; swap with one line.
 
@@ -138,13 +159,35 @@ Linux host):
 
 ## Security & scope
 
-This is a **single-user app designed to run on a trusted home LAN**. It has
-**no authentication** — anyone who can reach the host on your network can read
-the dashboard and API. That is intentional for a personal tool. **Do not
-expose it to the internet** (no port-forwarding, no public tunnel) without
-first putting it behind an authenticating reverse proxy (e.g. Caddy or nginx
-with Basic Auth + TLS). The services bind to `0.0.0.0` so other devices on
-your WiFi (your phone) can reach them; this is required for normal use.
+This is a **single-user app designed to run on a trusted home LAN**. By
+default it has **no authentication** — anyone who can reach the host on your
+network can read the dashboard and API. That is intentional for a personal
+tool. The services bind to `0.0.0.0` so other devices on your WiFi (your
+phone) can reach them; this is required for normal use.
+
+If "anyone on the WiFi" is too broad for your household, set
+`BONFIRE_API_TOKEN` in `.env`: every endpoint except `/health` then requires
+the token (`Authorization: Bearer …`, `X-Api-Token`, or `?token=`). Enter the
+same token once under **Settings → Security** in the dashboard and that
+browser keeps access; the Telegram bot picks it up from `.env` automatically.
+It's a shared secret, not a login system — good against curious LAN
+neighbours, not against the internet.
+
+**Do not expose the app to the internet** (no port-forwarding, no public
+tunnel) without first putting it behind an authenticating reverse proxy
+(e.g. Caddy or nginx with Basic Auth + TLS).
+
+## Backups & restore
+
+The `backup` service (or `python backend/backup_db.py`) writes consistent
+SQLite snapshots to `backend/data/backups/` (env: `BACKUP_DIR`,
+`BACKUP_KEEP`); the dashboard's health panel shows the age of the newest one,
+and **Settings → Data** can download a snapshot on demand.
+
+To restore: stop the services, replace `backend/data/bonfire.db` with a
+snapshot (also delete `bonfire.db-wal`/`-shm` if present), start again — the
+schema migrations re-apply automatically. Archived receipt originals live in
+`backend/data/archive/` and are worth backing up alongside the database.
 
 ## Development
 
