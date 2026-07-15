@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react"
 import {
-  createMealProfile, deleteMealProfile, getMealProfiles, getMeals, updateMealProfile,
-  type MealProfile, type MealsResponse,
+  createMealProfile, deleteMealProfile, getMealProfiles, getMeals, getSettings,
+  updateMealProfile, type MealProfile, type MealsResponse,
 } from "@/lib/api"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -25,6 +25,7 @@ export function MealsCard() {
   const [quick, setQuick] = useState(false)
   const [veg, setVeg] = useState(false)
   const [context, setContext] = useState<"trip" | "days">("trip")
+  const [days, setDays] = useState(14)
   const [result, setResult] = useState<MealsResponse | null>(null)
   const [ui, setUi] = useState<UiState>("idle")
   const [phase, setPhase] = useState(0)
@@ -40,6 +41,13 @@ export function MealsCard() {
 
   useEffect(() => {
     getMealProfiles().then(setProfiles).catch(() => setProfiles([]))
+    // Card defaults come from the settings dialog; ad-hoc changes stay local.
+    getSettings().then((s) => {
+      setProfileKey(s["meals.profile"])
+      setCount(s["meals.count"])
+      setContext(s["meals.context"])
+      setDays(s["meals.days"])
+    }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -54,7 +62,7 @@ export function MealsCard() {
     setPhase(0)
     try {
       const avoid = result?.meals.map((m) => m.title) ?? []
-      const data = await getMeals({ profile: profileKey, count, quick, vegetarian: veg, context, avoid })
+      const data = await getMeals({ profile: profileKey, count, quick, vegetarian: veg, context, days, avoid })
       if (mySeq !== seq.current) return // a newer request superseded this one
       setResult(data)
       setUi("done")
@@ -170,8 +178,8 @@ export function MealsCard() {
           {chip(quick, () => setQuick(!quick), "Quick")}
           {chip(veg, () => setVeg(!veg), "Veggie")}
           {chip(context === "trip", () => setContext(context === "trip" ? "days" : "trip"),
-            context === "trip" ? "Last trip" : "14 days",
-            "Ingredient context: your latest shopping trip per store, or a 14-day window")}
+            context === "trip" ? "Last trip" : `${days} days`,
+            "Ingredient context: your latest shopping trip per store, or a rolling window")}
           <div className="ml-auto">
             <Select value={String(count)} onValueChange={(v) => setCount(Number(v))}>
               <SelectTrigger className="h-7 w-[88px] border-border bg-secondary/40 text-xs">

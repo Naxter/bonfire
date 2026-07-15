@@ -62,6 +62,14 @@ class CategoryMap(SQLModel, table=True):
     is_locked: bool = Field(default=False)
 
 
+class Setting(SQLModel, table=True):
+    """App-level preference (the dashboard's settings dialog). Values are
+    stored JSON-encoded; defaults and validation live in app/settings.py —
+    the table only ever holds user overrides."""
+    key: str = Field(primary_key=True)
+    value: str
+
+
 class MealProfile(SQLModel, table=True):
     """A meal-suggestion persona: the user-editable instruction block of the
     prompt. Built-ins (see meal_profiles.py) are seeded at startup; their

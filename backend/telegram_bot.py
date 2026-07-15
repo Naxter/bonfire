@@ -111,8 +111,13 @@ def cmd_budget(chat_id) -> None:
     send(chat_id, "\n".join(lines))
 
 
-def cmd_meals(chat_id, profile: str = "family") -> None:
+def cmd_meals(chat_id, profile: str | None = None) -> None:
     send(chat_id, "🍝 Thinking…")
+    if not profile:
+        try:
+            profile = _api_get("/settings").get("meals.profile") or "family"
+        except Exception:
+            profile = "family"
     data = _api_get(f"/insights/meals?profile={requests.utils.quote(profile)}")
     meals = data.get("meals", [])
     if data.get("status") == "llm_error":
@@ -153,9 +158,9 @@ def handle_text(chat_id, text: str) -> None:
         cmd_budget(chat_id)
     elif low.startswith("/meals"):
         # Any word after /meals is a profile key (custom profiles included);
-        # the backend falls back to "adult" for unknown keys.
+        # without one, the default profile from the settings dialog is used.
         parts = low.split()
-        cmd_meals(chat_id, parts[1] if len(parts) > 1 else "family")
+        cmd_meals(chat_id, parts[1] if len(parts) > 1 else None)
     else:
         send(chat_id, "🤔 Let me check…")
         res = _api_get(f"/ask?q={requests.utils.quote(t)}")

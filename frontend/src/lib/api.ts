@@ -195,9 +195,31 @@ export interface RestockItem {
     name: string; category: string; times_bought: number;
     avg_interval_days: number; last_purchased: string; due_in_days: number; overdue: boolean;
 }
-export const getRestock = async (horizonDays = 3) => {
-    const response = await api.get(`/insights/restock?horizon_days=${horizonDays}`);
+// Without an argument the backend applies the horizon from the settings dialog.
+export const getRestock = async (horizonDays?: number) => {
+    const qs = horizonDays !== undefined ? `?horizon_days=${horizonDays}` : '';
+    const response = await api.get(`/insights/restock${qs}`);
     return response.data as RestockItem[];
+};
+
+// App-level preferences (settings dialog). Infrastructure stays in .env.
+export interface AppSettings {
+    "meals.profile": string;
+    "meals.count": number;
+    "meals.context": "trip" | "days";
+    "meals.days": number;
+    "restock.horizon_days": number;
+    "restock.min_purchases": number;
+    "budget.history_months": number;
+    "budget.anomaly_factor": number;
+}
+export const getSettings = async () => {
+    const response = await api.get('/settings');
+    return response.data as AppSettings;
+};
+export const updateSettings = async (values: Partial<AppSettings>) => {
+    const response = await api.put('/settings', values);
+    return response.data as AppSettings;
 };
 
 export interface BudgetCategory {

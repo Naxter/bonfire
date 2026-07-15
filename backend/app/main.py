@@ -24,6 +24,7 @@ from .database import create_db_and_tables, engine, get_session
 from .insights import answer_question, budget_report, meal_suggestions, restock_report
 from .llm import resolve_provider_name
 from .models import CategoryMap, Item, MealProfile, Product, Receipt
+from .settings import get_settings, update_settings
 from .stores import list_stores, store_display_name
 from .vision_ingest import IMAGE_EXTS, MAX_IMAGE_BYTES, process_image_file
 
@@ -481,15 +482,41 @@ async def scrape_rewe(request: Request):
 
 
 @app.get("/insights/restock")
-def get_restock(horizon_days: int = 3):
-    """Predictive shopping list — items due (or overdue) for repurchase."""
-    return restock_report(horizon_days=horizon_days)
+def get_restock(horizon_days: int | None = None):
+    """Predictive shopping list — items due (or overdue) for repurchase.
+    Defaults come from the settings dialog; the query param still overrides."""
+    s = get_settings()
+    return restock_report(
+        min_purchases=int(s["restock.min_purchases"]),
+        horizon_days=int(horizon_days if horizon_days is not None else s["restock.horizon_days"]),
+    )
 
 
 @app.get("/insights/budget")
 def get_budget():
-    """Month-end spend forecast plus category anomalies."""
-    return budget_report()
+    """Month-end spend forecast plus category anomalies (tuned via settings)."""
+    s = get_settings()
+    return budget_report(history_months=int(s["budget.history_months"]),
+                         anomaly_factor=float(s["budget.anomaly_factor"]))
+
+
+@app.get("/settings")
+def read_settings():
+    """App-level preferences (the dashboard's gear icon).
+
+    Infrastructure — credentials, ports, schedules — stays in .env by design;
+    these are the runtime-safe behavior knobs, merged from code defaults and
+    saved overrides."""
+    return get_settings()
+
+
+@app.put("/settings")
+def write_settings(values: dict):
+    """Save a partial settings update; returns the full merged settings."""
+    try:
+        return update_settings(values)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from None
 
 
 @app.get("/insights/meals")

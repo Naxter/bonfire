@@ -10,6 +10,7 @@ import {BudgetCard} from "@/components/dashboard/BudgetCard"
 import {MealsCard} from "@/components/dashboard/MealsCard"
 import {UploadReceiptButton} from "@/components/dashboard/UploadReceiptButton"
 import {FetchMailsButton} from "@/components/dashboard/FetchMailsButton"
+import {SettingsDialog} from "@/components/dashboard/SettingsDialog"
 import {TimeRange, DEFAULT_RANGE, type Range} from "@/components/dashboard/TimeRange"
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select"
 import {ScrollArea} from "@/components/ui/scroll-area"
@@ -236,6 +237,7 @@ export default function DashboardPage() {
                             </SelectContent>
                         </Select>
                     </div>
+                    <SettingsDialog/>
                 </div>
             </header>
 

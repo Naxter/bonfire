@@ -8,7 +8,8 @@ export function RestockCard() {
   const [items, setItems] = useState<RestockItem[] | null>(null)
 
   useEffect(() => {
-    getRestock(3).then(setItems).catch(() => setItems([]))
+    // no argument: the horizon from the settings dialog applies
+    getRestock().then(setItems).catch(() => setItems([]))
   }, [])
 
   return (
