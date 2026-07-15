@@ -17,12 +17,12 @@ a Raspberry Pi.
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Node 18+](https://img.shields.io/badge/node-18%2B-brightgreen)
 
-![Dashboard](docs/screenshot.png)
+![Today view](docs/screenshot.png)
 
 <details>
-<summary>Full dashboard screenshot</summary>
+<summary>Analytics view</summary>
 
-![Full dashboard](docs/screenshot-full.png)
+![Analytics](docs/screenshot-full.png)
 
 </details>
 
@@ -91,7 +91,7 @@ backend/data/inbox/*.pdf|*.jpg
    SQLite (WAL)  <── categorizer (LLM) ── items + receipts
         |
         v
-   FastAPI (app/main.py)  ──>  Next.js dashboard
+   FastAPI (app/routers/*)  ──>  Next.js dashboard
 ```
 
 Store parsing is adapter-based: REWE eBons are parsed from their PDF text
@@ -196,7 +196,7 @@ pip install pytest ruff
 (cd backend && pytest -q)              # unit tests (in-memory DB, LLM stubbed)
 ruff check .                           # lint, config in pyproject.toml
 
-(cd frontend && npm run lint)
+(cd frontend && npm run lint && npx tsc --noEmit)
 ```
 
 The database schema and lightweight migrations are applied automatically on

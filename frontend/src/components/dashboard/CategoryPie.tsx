@@ -62,6 +62,7 @@ export function CategoryPie({ data, activeCategory = null, onSelect }: CategoryP
               nameKey="name"
               strokeWidth={2}
               stroke={chart.pieStroke}
+              isAnimationActive={false}
               onClick={onSelect ? (slice) => slice.name && onSelect(String(slice.name)) : undefined}
             >
               {data.map((entry, index) => {
