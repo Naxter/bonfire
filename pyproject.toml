@@ -14,8 +14,9 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Depends()/File() in defaults is the FastAPI idiom.
+# Depends()/File()/Query() in defaults is the FastAPI idiom.
 "backend/app/main.py" = ["B008"]
+"backend/app/routers/*.py" = ["B008"]
 # LLM prompt text; long lines read better than wrapped prose.
 "backend/app/stores/dm.py" = ["E501"]
 

@@ -24,7 +24,8 @@ from sqlmodel import Session, func, select
 from .database import SQLITE_PATH, engine
 from .llm import complete
 from .meal_profiles import BUILTIN_MEAL_PROFILES
-from .models import Item, MealProfile, Receipt
+from .models import BudgetTarget, Item, MealProfile, PantryItem, Receipt, RestockAction
+from .products import normalize_key
 from .receipt_json import extract_json_object
 
 logger = logging.getLogger(__name__)
@@ -43,23 +44,36 @@ def restock_report(min_purchases: int = 3, horizon_days: int = 3, max_interval_d
     buy them. Returns those due within ``horizon_days``, most overdue first.
 
     Items overdue by more than ``max_overdue_factor`` × their usual interval are
-    treated as abandoned (fell out of rotation) and skipped."""
+    treated as abandoned (fell out of rotation) and skipped. Suggestions the
+    user dismissed or snoozed (see /insights/restock/actions) are hidden, and
+    each entry carries a quantity suggestion from past purchases."""
+    now = datetime.now()
     with Session(engine) as session:
         rows = session.exec(
-            select(Item.name, Item.category, Receipt.date).join(Receipt)
+            select(Item.name, Item.category, Item.quantity, Receipt.date).join(Receipt)
         ).all()
+        actions = {a.name_key: a for a in session.exec(select(RestockAction)).all()}
 
     per_item: dict[str, list] = defaultdict(list)
+    quantities: dict[str, list] = defaultdict(list)
     category: dict[str, str] = {}
-    for name, cat, date in rows:
+    for name, cat, qty, date in rows:
         if cat in _NON_CONSUMABLE:
             continue
         per_item[name].append(date)
+        quantities[name].append(qty or 1.0)
         category[name] = cat
 
-    today = datetime.now().date()
+    today = now.date()
     due = []
     for name, dates in per_item.items():
+        action = actions.get(normalize_key(name))
+        if action is not None:
+            if action.action == "dismissed":
+                continue
+            if action.until and action.until > now:
+                continue  # snoozed / marked bought
+
         days = sorted({d.date() for d in dates})  # one purchase per calendar day
         if len(days) < min_purchases:
             continue
@@ -84,6 +98,8 @@ def restock_report(min_purchases: int = 3, horizon_days: int = 3, max_interval_d
             "last_purchased": last.isoformat(),
             "due_in_days": due_in,
             "overdue": due_in < 0,
+            # Typical amount per shopping trip — the "how many" suggestion.
+            "suggested_qty": round(mean(quantities[name]), 1) if quantities.get(name) else 1.0,
         })
 
     due.sort(key=lambda x: x["due_in_days"])
@@ -94,13 +110,23 @@ def restock_report(min_purchases: int = 3, horizon_days: int = 3, max_interval_d
 # #8  Budget forecast + anomalies
 # --------------------------------------------------------------------------- #
 def budget_report(history_months: int = 6, anomaly_factor: float = 1.5) -> dict:
-    """Project this month's spend from the current pace and flag categories
-    running hot vs. their historical monthly average."""
+    """Project this month's spend from the current pace, compare against the
+    user's budget targets, flag categories running hot, and explain what
+    changed vs. the same days of last month."""
     now = datetime.now()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     days_in_month = calendar.monthrange(now.year, now.month)[1]
     days_elapsed = now.day
     hist_start = month_start - timedelta(days=history_months * 31)
+
+    if month_start.month == 1:
+        prev_month_start = month_start.replace(year=month_start.year - 1, month=12)
+    else:
+        prev_month_start = month_start.replace(month=month_start.month - 1)
+    # Day-for-day fair comparison: last month up to the same day-of-month.
+    prev_days = min(days_elapsed, calendar.monthrange(prev_month_start.year,
+                                                      prev_month_start.month)[1])
+    prev_cutoff = prev_month_start + timedelta(days=prev_days)
 
     def project(spent: float) -> float:
         return round(spent / days_elapsed * days_in_month, 2) if days_elapsed else 0.0
@@ -127,9 +153,23 @@ def budget_report(history_months: int = 6, anomaly_factor: float = 1.5) -> dict:
             .group_by(func.strftime("%Y-%m", Receipt.date), Item.category)
         ).all()
 
+        prev_rows = session.exec(
+            select(Item.category, func.sum(Item.price_total))
+            .join(Receipt)
+            .where(Receipt.date >= prev_month_start, Receipt.date < prev_cutoff)
+            .group_by(Item.category)
+        ).all()
+        prev_total = session.exec(
+            select(func.sum(Receipt.total_amount))
+            .where(Receipt.date >= prev_month_start, Receipt.date < prev_cutoff)
+        ).first() or 0.0
+
+        targets = {t.category: t.amount for t in session.exec(select(BudgetTarget)).all()}
+
     hist_by_cat: dict[str, list] = defaultdict(list)
     for _month, cat, total in hist_rows:
         hist_by_cat[cat].append(float(total or 0.0))
+    prev_by_cat = {cat: float(total or 0.0) for cat, total in prev_rows}
 
     categories = []
     for cat, spent in cur_rows:
@@ -138,6 +178,7 @@ def budget_report(history_months: int = 6, anomaly_factor: float = 1.5) -> dict:
         projected = project(spent)
         delta_pct = round((projected - avg) / avg * 100, 1) if avg > 0 else None
         anomaly = avg >= 5 and projected > avg * anomaly_factor
+        target = targets.get(cat)
         categories.append({
             "category": cat,
             "spent": round(spent, 2),
@@ -145,17 +186,43 @@ def budget_report(history_months: int = 6, anomaly_factor: float = 1.5) -> dict:
             "avg_month": round(avg, 2),
             "delta_pct": delta_pct,
             "anomaly": anomaly,
+            "target": target,
+            "remaining": round(target - spent, 2) if target is not None else None,
+            "over_target": target is not None and spent > target,
+            "projected_over_target": target is not None and projected > target,
         })
     categories.sort(key=lambda c: c["projected"], reverse=True)
 
+    # "What changed?" — the categories that moved the total vs. last month.
+    changes = []
+    for cat in set(prev_by_cat) | {c["category"] for c in categories}:
+        current = next((c["spent"] for c in categories if c["category"] == cat), 0.0)
+        before = prev_by_cat.get(cat, 0.0)
+        delta = round(current - before, 2)
+        if abs(delta) >= 1.0:
+            changes.append({"category": cat, "delta": delta,
+                            "spent": round(current, 2), "previous": round(before, 2)})
+    changes.sort(key=lambda c: abs(c["delta"]), reverse=True)
+
+    overall_target = targets.get("")
+    spent_so_far = round(float(month_total), 2)
     return {
         "month": now.strftime("%Y-%m"),
         "days_elapsed": days_elapsed,
         "days_in_month": days_in_month,
-        "spent_so_far": round(float(month_total), 2),
+        "spent_so_far": spent_so_far,
         "projected_total": project(float(month_total)),
+        "previous_month_to_date": round(float(prev_total), 2),
+        "target": overall_target,
+        "remaining": round(overall_target - spent_so_far, 2) if overall_target is not None else None,
+        "over_target": overall_target is not None and spent_so_far > overall_target,
+        "projected_over_target": (overall_target is not None
+                                  and project(float(month_total)) > overall_target),
         "categories": categories,
         "anomalies": [c for c in categories if c["anomaly"]],
+        "alerts": [c for c in categories
+                   if c["over_target"] or c["projected_over_target"] or c["anomaly"]],
+        "changes": changes[:5],
     }
 
 
@@ -233,6 +300,19 @@ def _meal_ingredients(context: str, days: int, max_items: int) -> tuple[list[str
     else:
         newest = _collect_foods(window_rows)
         info = {"mode": "days", "widened": False, "label": f"the last {days} days"}
+
+    # A maintained pantry beats any purchase heuristic — purchases can't see
+    # consumption. Pantry items rank first (they're confirmed to be there).
+    with Session(engine) as session:
+        pantry = session.exec(select(PantryItem).where(PantryItem.quantity > 0)).all()
+    if pantry:
+        bump = datetime.now() + timedelta(days=1)
+        for row in pantry:
+            if (row.category or "") in _NON_FOOD:
+                continue
+            newest[row.name] = bump
+        info["pantry_items"] = len(pantry)
+        info["label"] += " plus your pantry"
 
     foods = sorted(newest, key=newest.get, reverse=True)[:max_items]
     return foods, info

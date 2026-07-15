@@ -39,7 +39,7 @@ def parsed_receipt(**overrides) -> ParsedReceipt:
 
 
 def test_persist_stores_receipt_items_and_products(mem_engine):
-    assert ingest._persist(parsed_receipt(), "a.pdf", content_hash="h1") is True
+    assert ingest._persist(parsed_receipt(), "a.pdf", content_hash="h1").stored is True
     with Session(mem_engine) as session:
         receipt = session.exec(select(Receipt)).one()
         assert receipt.store_key == "rewe"
@@ -50,8 +50,8 @@ def test_persist_stores_receipt_items_and_products(mem_engine):
 
 
 def test_same_content_hash_is_deduped_across_filenames(mem_engine):
-    assert ingest._persist(parsed_receipt(), "a.pdf", content_hash="h1") is True
-    assert ingest._persist(parsed_receipt(), "renamed.pdf", content_hash="h1") is False
+    assert ingest._persist(parsed_receipt(), "a.pdf", content_hash="h1").stored is True
+    assert ingest._persist(parsed_receipt(), "renamed.pdf", content_hash="h1").stored is False
     with Session(mem_engine) as session:
         assert len(session.exec(select(Receipt)).all()) == 1
 
@@ -59,14 +59,14 @@ def test_same_content_hash_is_deduped_across_filenames(mem_engine):
 def test_same_transaction_id_is_deduped_without_hash(mem_engine):
     first = parsed_receipt(transaction_id="tx-1")
     second = parsed_receipt(transaction_id="tx-1")
-    assert ingest._persist(first, "a.pdf") is True
-    assert ingest._persist(second, "b.pdf") is False
+    assert ingest._persist(first, "a.pdf").stored is True
+    assert ingest._persist(second, "b.pdf").stored is False
 
 
 def test_rehash_adopts_hash_on_existing_receipt(mem_engine):
     # Rows ingested before content hashing existed get the hash on re-sight.
-    assert ingest._persist(parsed_receipt(transaction_id="tx-1"), "a.pdf") is True
-    assert ingest._persist(parsed_receipt(transaction_id="tx-1"), "a.pdf", content_hash="h9") is False
+    assert ingest._persist(parsed_receipt(transaction_id="tx-1"), "a.pdf").stored is True
+    assert ingest._persist(parsed_receipt(transaction_id="tx-1"), "a.pdf", content_hash="h9").stored is False
     with Session(mem_engine) as session:
         assert session.exec(select(Receipt)).one().content_hash == "h9"
 

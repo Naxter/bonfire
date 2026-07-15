@@ -40,6 +40,9 @@ SPECS: dict[str, Spec] = {
     # Budget forecast
     "budget.history_months": Spec(default=6, kind=int, lo=2, hi=24),
     "budget.anomaly_factor": Spec(default=1.5, kind=float, lo=1.1, hi=5.0),
+    # Price alerts: flag a product when its latest price is this % above the
+    # cheapest of its recent purchases.
+    "alerts.price_increase_pct": Spec(default=15, kind=int, lo=5, hi=100),
 }
 
 

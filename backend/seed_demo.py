@@ -107,27 +107,30 @@ def main():
         date = now - timedelta(days=week * 7 + random.randint(0, 2), hours=random.randint(1, 9))
         receipt = make_receipt("rewe", "REWE Markt", REWE_PRODUCTS, date,
                                random.randint(9, 15), f"demo-rewe-{week}")
-        count += ingest._persist(receipt, f"demo_rewe_{week}.pdf", content_hash=f"demo-hash-rewe-{week}")
+        count += 1 if ingest._persist(receipt, f"demo_rewe_{week}.pdf",
+                                     content_hash=f"demo-hash-rewe-{week}").stored else 0
         if week % 3 == 0:
             topup_date = date + timedelta(days=3)
             if topup_date < now:
                 topup = make_receipt("rewe", "REWE Markt", REWE_PRODUCTS, topup_date,
                                      random.randint(4, 7), f"demo-rewe-top-{week}")
-                count += ingest._persist(topup, f"demo_rewe_top_{week}.pdf",
-                                         content_hash=f"demo-hash-rewe-top-{week}")
+                count += 1 if ingest._persist(topup, f"demo_rewe_top_{week}.pdf",
+                                         content_hash=f"demo-hash-rewe-top-{week}").stored else 0
 
     # DM roughly every 3 weeks
     for i in range(9):
         date = now - timedelta(days=i * 21 + random.randint(0, 4))
         receipt = make_receipt("dm", "dm-drogerie markt", DM_PRODUCTS, date,
                                random.randint(3, 6), f"demo-dm-{i}")
-        count += ingest._persist(receipt, f"demo_dm_{i}.pdf", content_hash=f"demo-hash-dm-{i}")
+        count += 1 if ingest._persist(receipt, f"demo_dm_{i}.pdf",
+                                     content_hash=f"demo-hash-dm-{i}").stored else 0
 
     # A few photographed Aldi receipts (the vision-ingest path's store)
     for i in range(4):
         date = now - timedelta(days=i * 40 + 5)
         receipt = make_receipt("aldi", "ALDI SÜD", ALDI_PRODUCTS, date, 3, f"demo-aldi-{i}")
-        count += ingest._persist(receipt, f"demo_aldi_{i}.jpg", content_hash=f"demo-hash-aldi-{i}")
+        count += 1 if ingest._persist(receipt, f"demo_aldi_{i}.jpg",
+                                     content_hash=f"demo-hash-aldi-{i}").stored else 0
 
     print(f"Seeded {count} new demo receipt(s).")
 

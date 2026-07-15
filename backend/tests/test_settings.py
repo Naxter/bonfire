@@ -3,6 +3,7 @@
 import pytest
 from app import main
 from app import settings as settings_module
+from app.routers import budget_api, insights_api
 from app.settings import SPECS, get_settings, update_settings
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
@@ -57,7 +58,7 @@ def test_put_endpoint_validates(mem_engine):
 def test_restock_endpoint_uses_saved_settings(mem_engine, monkeypatch):
     update_settings({"restock.horizon_days": 9, "restock.min_purchases": 4})
     captured = {}
-    monkeypatch.setattr(main, "restock_report", lambda **kw: captured.update(kw) or [])
+    monkeypatch.setattr(insights_api, "restock_report", lambda **kw: captured.update(kw) or [])
     assert client.get("/insights/restock").status_code == 200
     assert captured == {"min_purchases": 4, "horizon_days": 9}
 
@@ -65,7 +66,7 @@ def test_restock_endpoint_uses_saved_settings(mem_engine, monkeypatch):
 def test_restock_query_param_still_overrides(mem_engine, monkeypatch):
     update_settings({"restock.horizon_days": 9})
     captured = {}
-    monkeypatch.setattr(main, "restock_report", lambda **kw: captured.update(kw) or [])
+    monkeypatch.setattr(insights_api, "restock_report", lambda **kw: captured.update(kw) or [])
     client.get("/insights/restock?horizon_days=2")
     assert captured["horizon_days"] == 2
 
@@ -73,6 +74,6 @@ def test_restock_query_param_still_overrides(mem_engine, monkeypatch):
 def test_budget_endpoint_uses_saved_settings(mem_engine, monkeypatch):
     update_settings({"budget.history_months": 12, "budget.anomaly_factor": 3.0})
     captured = {}
-    monkeypatch.setattr(main, "budget_report", lambda **kw: captured.update(kw) or {})
+    monkeypatch.setattr(budget_api, "budget_report", lambda **kw: captured.update(kw) or {})
     assert client.get("/insights/budget").status_code == 200
     assert captured == {"history_months": 12, "anomaly_factor": 3.0}

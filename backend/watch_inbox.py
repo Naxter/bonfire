@@ -17,9 +17,10 @@ import time
 from pathlib import Path
 
 import app.config  # noqa: F401  (loads repo-root .env)
-from app.database import create_db_and_tables
-from app.ingest import ensure_inbox_dirs, process_pdf_file
-from app.vision_ingest import IMAGE_EXTS, process_image_file
+from app.database import DATA_DIR, create_db_and_tables
+from app.ingest import ensure_inbox_dirs
+from app.jobs import process_tracked_file
+from app.vision_ingest import IMAGE_EXTS
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.polling import PollingObserver
@@ -74,19 +75,17 @@ def _ingest(path: Path) -> None:
     if not path.exists():
         return
     ext = path.suffix.lower()
-    is_pdf = ext == ".pdf"
-    is_image = ext in IMAGE_EXTS
-    if not (is_pdf or is_image):
+    if ext != ".pdf" and ext not in IMAGE_EXTS:
         return
     with _ingest_lock:
-        if not _wait_until_stable(path):
+        # Re-check under the lock: the drain and a watchdog event can race for
+        # the same file, and the winner archives it away.
+        if not path.exists() or not _wait_until_stable(path):
             return
         try:
-            # both parse, persist, and archive the file themselves
-            if is_pdf:
-                process_pdf_file(str(path))
-            else:
-                process_image_file(str(path))
+            # Parses, persists, archives AND records an ImportJob row, so the
+            # dashboard's import history shows watcher pickups too.
+            process_tracked_file(str(path), kind="watcher")
         except Exception:
             logger.exception("Failed to ingest %s", path.name)
 
@@ -102,10 +101,26 @@ class _InboxHandler(FileSystemEventHandler):
             _ingest(Path(event.dest_path))
 
 
+# The API's /health endpoint reads this file's mtime to answer "is the watcher
+# container actually alive?" — a question docker ps can't answer from inside.
+HEARTBEAT_FILE = DATA_DIR / ".watcher_heartbeat"
+_HEARTBEAT_INTERVAL = 30.0
+
+
+def _heartbeat_loop() -> None:
+    while True:
+        try:
+            HEARTBEAT_FILE.touch()
+        except OSError:
+            logger.warning("Could not touch watcher heartbeat file.")
+        time.sleep(_HEARTBEAT_INTERVAL)
+
+
 def main() -> None:
     create_db_and_tables()
     INBOX_DIR.mkdir(parents=True, exist_ok=True)
     ensure_inbox_dirs(INBOX_DIR)  # create inbox/<store>/ drop folders
+    threading.Thread(target=_heartbeat_loop, daemon=True).start()
 
     # Watch BEFORE draining. Files that land while the drain runs get an event;
     # draining first left a gap (minutes, when a scraper dumps a whole mailbox)

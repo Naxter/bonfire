@@ -18,6 +18,8 @@ so run it alongside the API service.
 import logging
 import os
 import time
+from datetime import datetime
+from pathlib import Path
 
 import app.config  # noqa: F401  (loads repo-root .env)
 import requests
@@ -34,6 +36,11 @@ def _redact(msg: object) -> str:
     return s.replace(TOKEN, "***") if TOKEN else s
 API = os.getenv("GROCERY_API_URL", "http://localhost:8000").rstrip("/")
 ALLOWED = {x.strip() for x in os.getenv("TELEGRAM_ALLOWED_CHAT_IDS", "").split(",") if x.strip()}
+
+# When the API requires a token (BONFIRE_API_TOKEN in .env), send it along —
+# the bot reads the same .env, so this Just Works.
+_API_TOKEN = (os.getenv("BONFIRE_API_TOKEN") or "").strip()
+API_HEADERS = {"X-Api-Token": _API_TOKEN} if _API_TOKEN else {}
 
 TG = f"https://api.telegram.org/bot{TOKEN}"
 TG_FILE = f"https://api.telegram.org/file/bot{TOKEN}"
@@ -64,7 +71,8 @@ def handle_photo(chat_id, photo_sizes: list) -> None:
         path = fp["result"]["file_path"]
         image = requests.get(f"{TG_FILE}/{path}", timeout=30).content
         resp = requests.post(f"{API}/ingest/image",
-                             files={"file": ("receipt.jpg", image, "image/jpeg")}, timeout=180)
+                             files={"file": ("receipt.jpg", image, "image/jpeg")},
+                             headers=API_HEADERS, timeout=180)
     except requests.RequestException as e:
         logger.error("photo ingest failed: %s", _redact(e))
         send(chat_id, "❌ Something went wrong reading that. Try again?")
@@ -82,7 +90,7 @@ def handle_photo(chat_id, photo_sizes: list) -> None:
 
 
 def _api_get(path: str):
-    return requests.get(f"{API}{path}", timeout=180).json()
+    return requests.get(f"{API}{path}", headers=API_HEADERS, timeout=180).json()
 
 
 def cmd_restock(chat_id) -> None:
@@ -147,6 +155,57 @@ def cmd_meals(chat_id, profile: str | None = None) -> None:
     send(chat_id, "\n".join(lines))
 
 
+# --- optional weekly summary ------------------------------------------------ #
+# Set TELEGRAM_WEEKLY_SUMMARY in .env (e.g. "sun 18" — weekday + hour, 24h
+# clock; just "sun" defaults to 18:00) and the bot pushes a budget + restock
+# recap once a week to every allowed chat. Unset = off.
+_DAYS = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+_SUMMARY_MARKER = Path(__file__).resolve().parent / "data" / ".telegram_last_summary"
+
+
+def _parse_summary_spec(spec: str):
+    if not spec:
+        return None
+    parts = spec.split()
+    try:
+        day = _DAYS[parts[0][:3]]
+        hour = max(0, min(23, int(parts[1]))) if len(parts) > 1 else 18
+        return (day, hour)
+    except (KeyError, ValueError, IndexError):
+        logger.warning("Ignoring invalid TELEGRAM_WEEKLY_SUMMARY %r (use e.g. 'sun 18').", spec)
+        return None
+
+
+_SUMMARY_TARGET = _parse_summary_spec(os.getenv("TELEGRAM_WEEKLY_SUMMARY", "").strip().lower())
+
+
+def _maybe_weekly_summary() -> None:
+    """Called on every poll-loop tick; sends at most one recap per ISO week."""
+    if _SUMMARY_TARGET is None or not ALLOWED:
+        return
+    now = datetime.now()
+    day, hour = _SUMMARY_TARGET
+    if now.weekday() != day or now.hour != hour:
+        return
+    week_key = f"{now.isocalendar().year}-W{now.isocalendar().week}"
+    try:
+        if _SUMMARY_MARKER.exists() and _SUMMARY_MARKER.read_text().strip() == week_key:
+            return
+    except OSError:
+        pass
+    for chat_id in ALLOWED:
+        try:
+            send(chat_id, "🗓 Weekly recap")
+            cmd_budget(chat_id)
+            cmd_restock(chat_id)
+        except Exception:
+            logger.exception("Weekly summary failed for chat %s", chat_id)
+    try:
+        _SUMMARY_MARKER.write_text(week_key)
+    except OSError:
+        logger.warning("Could not persist the weekly-summary marker.")
+
+
 def handle_text(chat_id, text: str) -> None:
     t = text.strip()
     low = t.lower()
@@ -200,6 +259,7 @@ def main() -> None:
             logger.warning("getUpdates rejected: %s", data.get("description", "unknown reason"))
             time.sleep(5)
             continue
+        _maybe_weekly_summary()
         updates = data.get("result", [])
 
         for upd in updates:

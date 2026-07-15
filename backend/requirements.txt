@@ -1,28 +1,32 @@
+# Pinned versions: reproducible builds on the Pi (upgrade deliberately, not
+# whenever an image rebuild happens to run). All pins are verified together by
+# the test suite; bump them in one PR and re-run `pytest`.
+
 # --- Core API + data layer ---
-fastapi>=0.139.0
-uvicorn[standard]>=0.51.0
-sqlmodel>=0.0.39            # brings in SQLAlchemy
-python-dotenv>=1.2.2
-python-multipart>=0.0.32     # required by FastAPI for the receipt photo upload
-slowapi>=0.1.10              # rate limiting on LLM-cost endpoints
+fastapi==0.139.0
+uvicorn[standard]==0.51.0
+sqlmodel==0.0.39            # brings in SQLAlchemy
+python-dotenv==1.2.2
+python-multipart==0.0.32     # required by FastAPI for the receipt photo upload
+slowapi==0.1.10              # rate limiting on LLM-cost endpoints
 
 # --- Receipt parsing ---
-PyMuPDF>=1.28.0               # imported as `fitz`; PDF text extraction
-rewe-ebon-parser>=0.0.8,<0.1  # REWE eBon PDFs (upstream is still 0.x — no 1.0 exists)
+PyMuPDF==1.28.0               # imported as `fitz`; PDF text extraction
+rewe-ebon-parser==0.0.8       # REWE eBon PDFs (upstream is still 0.x — no 1.0 exists)
 
 # --- Ingest + integrations ---
-watchdog>=6.0.0               # inbox folder watcher (PDFs and photos)
-requests>=2.34.2              # Telegram bot
+watchdog==6.0.0               # inbox folder watcher (PDFs and photos)
+requests==2.34.2              # Telegram bot
 
 # --- email-scraper/ (run by the scrape timer / container) ---
-loguru>=0.7.3                 # scraper.py
+loguru==0.7.3                 # scraper.py
 
 # --- LLM providers ---
 # Only the active one is imported at runtime. It's auto-detected from whichever
 # API key is in .env (or force it with LLM_PROVIDER). Drop the ones you don't
 # use to slim the install — nothing else depends on them.
-openai>=2.45.0                # cloud, recommended. 1.55+ needed for httpx>=0.28 compat
-google-genai>=2.11.0           # cloud (Gemini)
-ollama>=0.6.2               # local only; not needed on a cloud-API box
+openai==2.45.0                # cloud, recommended
+google-genai==2.11.0          # cloud (Gemini)
+ollama==0.6.2                 # local only; not needed on a cloud-API box
 
 # Dev tools are not runtime dependencies:  pip install pytest ruff
