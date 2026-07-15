@@ -47,7 +47,9 @@ def receipt_date_tag(subject: str) -> str:
     return tag.replace(".", "_")
 
 
-def save_pdf_attachments(msg, date_tag: str) -> None:
+def save_pdf_attachments(msg, date_tag: str) -> int:
+    """Save the message's PDF attachments into the inbox; returns how many were new."""
+    saved = 0
     for part in msg.walk():
         if part.get_content_maintype() == "multipart" or part.get("Content-Disposition") is None:
             continue
@@ -75,9 +77,12 @@ def save_pdf_attachments(msg, date_tag: str) -> None:
             continue
         file_path.write_bytes(payload)
         logger.info(f"Saved {file_name}")
+        saved += 1
+    return saved
 
 
-def fetch_ebons() -> None:
+def fetch_ebons() -> dict:
+    """Run one mailbox sweep; returns {"mails_matched": N, "saved": M}."""
     username = os.getenv("GMX_USER")
     password = os.getenv("GMX_PASSWORD")
     imap_host = os.getenv("GMX_IMAP_HOST", "imap.gmx.net")
@@ -91,6 +96,7 @@ def fetch_ebons() -> None:
 
     INBOX_DIR.mkdir(parents=True, exist_ok=True)
 
+    saved = 0
     # Socket timeout so a stalled peer can't hang the scrape loop.
     mail = imaplib.IMAP4_SSL(imap_host, port=993, timeout=30)
     try:
@@ -107,10 +113,13 @@ def fetch_ebons() -> None:
                 if not isinstance(response_part, tuple):
                     continue
                 msg = email.message_from_bytes(response_part[1])
-                save_pdf_attachments(msg, receipt_date_tag(decode_subject(msg)))
+                saved += save_pdf_attachments(msg, receipt_date_tag(decode_subject(msg)))
         mail.close()
     finally:
         mail.logout()
+
+    logger.info(f"Sweep done: {len(mail_ids)} matching mail(s), {saved} new file(s).")
+    return {"mails_matched": len(mail_ids), "saved": saved}
 
 
 if __name__ == "__main__":

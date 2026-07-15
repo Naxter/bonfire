@@ -274,4 +274,10 @@ export const uploadReceiptImage = async (file: File) => {
     return response.data as { status: string; stored: boolean; store_name: string; total: number; items: number; date: string };
 };
 
+// On-demand run of the REWE mail scraper (the scheduled one polls hourly).
+export const fetchReweMails = async () => {
+    const response = await api.post('/scrape/rewe');
+    return response.data as { status: string; mails_matched: number; saved: number };
+};
+
 export default api;

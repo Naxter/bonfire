@@ -1,6 +1,10 @@
+import asyncio
+import importlib.util
+import logging
 import os
 import re
 import tempfile
+import threading
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -431,6 +435,49 @@ async def ingest_image(request: Request, file: UploadFile = File(...)):
     if result is None:
         raise HTTPException(status_code=422, detail="Could not read a receipt from that image.")
     return {"status": "ok", **result}
+
+
+# --- On-demand REWE mail fetch -------------------------------------------- #
+# The scheduled scraper container runs email-scraper/scraper.py on an interval;
+# this endpoint runs the same code once, right now, for the header's
+# "Fetch mails" button. The scraper writes into backend/data/inbox/rewe/,
+# where the watcher picks the files up.
+_scrape_logger = logging.getLogger("app.scrape")
+_scrape_lock = threading.Lock()
+_SCRAPER_PATH = Path(__file__).resolve().parents[2] / "email-scraper" / "scraper.py"
+
+
+def _run_rewe_fetch() -> dict:
+    spec = importlib.util.spec_from_file_location("rewe_scraper", _SCRAPER_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.fetch_ebons()
+
+
+@app.post("/scrape/rewe")
+@limiter.limit("4/minute")
+async def scrape_rewe(request: Request):
+    """Fetch REWE eBons from the mailbox once, on demand."""
+    if not (os.getenv("GMX_USER") and os.getenv("GMX_PASSWORD") and os.getenv("REWE_SENDER")):
+        raise HTTPException(
+            status_code=503,
+            detail="The mail scraper is not configured (GMX_USER / GMX_PASSWORD / REWE_SENDER).",
+        )
+    if not _scrape_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="A mail fetch is already running.")
+    try:
+        result = await asyncio.to_thread(_run_rewe_fetch)
+        return {"status": "ok", **result}
+    except SystemExit as e:  # scraper CLI guards signal missing config this way
+        raise HTTPException(status_code=503, detail=str(e)) from None
+    except Exception:
+        _scrape_logger.exception("On-demand REWE fetch failed")
+        raise HTTPException(
+            status_code=502,
+            detail="Mail fetch failed — IMAP login or network problem; check the server logs.",
+        ) from None
+    finally:
+        _scrape_lock.release()
 
 
 @app.get("/insights/restock")
