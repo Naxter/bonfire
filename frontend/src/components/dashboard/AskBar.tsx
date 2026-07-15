@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { ask, type AskResponse } from "@/lib/api"
+import { useI18n } from "@/lib/i18n"
 import { Sparkles } from "lucide-react"
 
 // Minimal markdown for LLM answers — **bold**, *italic*, `code`, "- " bullets.
@@ -49,6 +50,7 @@ function Answer({ text }: { text: string }) {
 }
 
 export function AskBar() {
+  const { t } = useI18n()
   const [q, setQ] = useState("")
   const [loading, setLoading] = useState(false)
   const [res, setRes] = useState<AskResponse | null>(null)
@@ -61,7 +63,7 @@ export function AskBar() {
     try {
       setRes(await ask(q.trim()))
     } catch {
-      setRes({ question: q, error: "Request failed — is the backend reachable?" })
+      setRes({ question: q, error: t("ask.error") })
     } finally {
       setLoading(false)
     }
@@ -70,11 +72,12 @@ export function AskBar() {
   return (
     <div className="hud-panel p-4">
       <form onSubmit={submit} className="flex items-center gap-2">
-        <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+        <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Ask your groceries…  e.g. “how much did I spend on drinks last month?”"
+          placeholder={t("ask.placeholder")}
+          aria-label={t("ask.button")}
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
         <button
@@ -82,7 +85,7 @@ export function AskBar() {
           disabled={loading || !q.trim()}
           className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
         >
-          {loading ? "Thinking…" : "Ask"}
+          {loading ? t("meals.thinking") : t("ask.button")}
         </button>
       </form>
 

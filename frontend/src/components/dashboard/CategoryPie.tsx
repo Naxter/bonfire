@@ -1,7 +1,9 @@
 "use client"
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { categoryColor, CHART } from "@/lib/theme";
+import { categoryColor } from "@/lib/theme";
+import { useChartTheme } from "@/lib/use-chart-theme";
+import { useI18n } from "@/lib/i18n";
 import type { CategorySpend } from "@/lib/api";
 
 interface CustomTooltipProps {
@@ -31,10 +33,12 @@ interface CategoryPieProps {
 }
 
 export function CategoryPie({ data, activeCategory = null, onSelect }: CategoryPieProps) {
+  const chart = useChartTheme();
+  const { t } = useI18n();
   if (!data || data.length === 0) {
     return (
       <div className="flex h-[300px] w-full items-center justify-center text-sm text-muted-foreground">
-        No category data available yet.
+        {t("analytics.noPeriodData")}
       </div>
     );
   }
@@ -57,7 +61,7 @@ export function CategoryPie({ data, activeCategory = null, onSelect }: CategoryP
               dataKey="value"
               nameKey="name"
               strokeWidth={2}
-              stroke={CHART.pieStroke}
+              stroke={chart.pieStroke}
               onClick={onSelect ? (slice) => slice.name && onSelect(String(slice.name)) : undefined}
             >
               {data.map((entry, index) => {

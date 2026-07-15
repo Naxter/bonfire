@@ -48,6 +48,8 @@
 
 /* ============================================================
    CALM THEME — soft sage on muted slate
+   Three variants: .dark (default), .light, .hc (high-contrast dark).
+   next-themes stamps the class on <html>.
    ============================================================ */
 :root,
 .dark {
@@ -99,6 +101,127 @@
   /* Accent helper tokens */
   --neon: #8cb08c;
   --neon-soft: rgba(140, 176, 140, 0.30);
+
+  /* Status hues (badges, alerts) */
+  --good: #86b992;
+  --warn: #d1a56b;
+  --bad: #cf8080;
+
+  --panel-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  --panel-shadow-hover: 0 6px 20px -12px rgba(0, 0, 0, 0.55);
+  --panel-border-hover: rgba(150, 170, 190, 0.26);
+}
+
+/* --- Light: same calm family, papers instead of slate --- */
+.light {
+  --background: #eef1f4;
+  --foreground: #273240;
+
+  --card: #ffffff;
+  --card-foreground: #273240;
+
+  --popover: #ffffff;
+  --popover-foreground: #273240;
+
+  --primary: #55805c;              /* deeper sage for contrast on white */
+  --primary-foreground: #f5f9f5;
+
+  --secondary: #e3e8ee;
+  --secondary-foreground: #3a4654;
+
+  --muted: #e7ebf0;
+  --muted-foreground: #5d6a7a;
+
+  --accent: #dbe3ea;
+  --accent-foreground: #273240;
+
+  --destructive: #b05252;
+
+  --border: rgba(40, 60, 85, 0.16);
+  --input: rgba(40, 60, 85, 0.16);
+  --ring: #55805c;
+
+  --chart-1: #5d8a64;
+  --chart-2: #5a7d9e;
+  --chart-3: #a87070;
+  --chart-4: #ac8b56;
+  --chart-5: #77699e;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #273240;
+  --sidebar-primary: #55805c;
+  --sidebar-primary-foreground: #f5f9f5;
+  --sidebar-accent: #dbe3ea;
+  --sidebar-accent-foreground: #273240;
+  --sidebar-border: rgba(40, 60, 85, 0.16);
+  --sidebar-ring: #55805c;
+
+  --neon: #4a7351;
+  --neon-soft: rgba(74, 115, 81, 0.22);
+
+  --good: #3f7a4d;
+  --warn: #9a6f2f;
+  --bad: #a84c4c;
+
+  --panel-shadow: 0 1px 2px rgba(30, 45, 60, 0.08);
+  --panel-shadow-hover: 0 6px 20px -12px rgba(30, 45, 60, 0.25);
+  --panel-border-hover: rgba(40, 60, 85, 0.3);
+}
+
+/* --- High contrast: dark, but nothing subtle about it --- */
+.hc {
+  --background: #000000;
+  --foreground: #ffffff;
+
+  --card: #0b0e12;
+  --card-foreground: #ffffff;
+
+  --popover: #0b0e12;
+  --popover-foreground: #ffffff;
+
+  --primary: #8fd694;
+  --primary-foreground: #001300;
+
+  --secondary: #161b22;
+  --secondary-foreground: #f0f4f8;
+
+  --muted: #14181e;
+  --muted-foreground: #c3ccd6;
+
+  --accent: #1d242d;
+  --accent-foreground: #ffffff;
+
+  --destructive: #ff8f8f;
+
+  --border: rgba(255, 255, 255, 0.38);
+  --input: rgba(255, 255, 255, 0.38);
+  --ring: #8fd694;
+
+  --chart-1: #8fd694;
+  --chart-2: #8ab8e8;
+  --chart-3: #e8a0a0;
+  --chart-4: #e8c88a;
+  --chart-5: #b3a6e8;
+
+  --sidebar: #0b0e12;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #8fd694;
+  --sidebar-primary-foreground: #001300;
+  --sidebar-accent: #1d242d;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.38);
+  --sidebar-ring: #8fd694;
+
+  --neon: #a5e8aa;
+  --neon-soft: rgba(165, 232, 170, 0.4);
+
+  --good: #9fe8a8;
+  --warn: #f0cf8a;
+  --bad: #ff9f9f;
+
+  --panel-shadow: none;
+  --panel-shadow-hover: none;
+  --panel-border-hover: rgba(255, 255, 255, 0.6);
 }
 
 @layer base {
@@ -109,6 +232,12 @@
     @apply bg-background text-foreground;
     background-attachment: fixed;
   }
+  /* Keyboard users always see where they are. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
 
 /* --- Soft, quiet background --- */
@@ -118,6 +247,10 @@
     radial-gradient(1100px 600px at 82% -12%, rgba(122, 160, 122, 0.05), transparent 62%),
     radial-gradient(900px 520px at 2% 6%, rgba(107, 140, 174, 0.045), transparent 60%);
 }
+.light .app-grid-bg,
+.hc .app-grid-bg {
+  background-image: none;
+}
 
 /* --- Quiet card panel --- */
 .hud-panel {
@@ -125,12 +258,12 @@
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--panel-shadow);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .hud-panel:hover {
-  border-color: rgba(150, 170, 190, 0.26);
-  box-shadow: 0 6px 20px -12px rgba(0, 0, 0, 0.55);
+  border-color: var(--panel-border-hover);
+  box-shadow: var(--panel-shadow-hover);
 }
 /* HUD accent line + corner brackets removed for a calmer look */
 .hud-panel::before { content: none; }
@@ -145,13 +278,20 @@
   font-weight: 600;
   color: var(--muted-foreground);
 }
+.hc .hud-label {
+  font-size: 0.75rem;
+  color: var(--foreground);
+}
 .font-display { font-family: var(--font-manrope), var(--font-inter), sans-serif; }
 
-.neon-text {
-  color: #eef3f8;
-}
+.neon-text { color: var(--foreground); }
 .neon-cyan { color: var(--neon); }
 .glow-cyan { box-shadow: none; }
+
+/* Status text helpers (theme-aware, not raw Tailwind hues) */
+.status-good { color: var(--good); }
+.status-warn { color: var(--warn); }
+.status-bad { color: var(--bad); }
 
 /* Gentle status dot — soft opacity breathe, no expanding ring */
 .pulse-dot {
@@ -160,6 +300,9 @@
 @keyframes hud-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot { animation: none; }
 }
 
 /* --- Custom scrollbars --- */
@@ -175,7 +318,10 @@
 }
 *::-webkit-scrollbar-thumb:hover { background: rgba(150, 170, 190, 0.4); }
 
-/* Date/number inputs readable on dark */
-input[type="month"], input[type="week"], input[type="number"] {
+/* Date/number inputs readable on both schemes */
+:root, .dark, .hc {
   color-scheme: dark;
+}
+.light {
+  color-scheme: light;
 }

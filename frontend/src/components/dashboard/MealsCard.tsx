@@ -5,6 +5,7 @@ import {
   createMealProfile, deleteMealProfile, getMealProfiles, getMeals, getSettings,
   updateMealProfile, type MealProfile, type MealsResponse,
 } from "@/lib/api"
+import { useI18n } from "@/lib/i18n"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -12,13 +13,14 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Pencil, UtensilsCrossed } from "lucide-react"
+import { PanelHeader } from "@/components/shared/bits"
 
 const NEW_PROFILE = "__new__"
-const LOADING_PHASES = ["Checking the pantry…", "Asking the chef…", "Plating up…"]
 
 type UiState = "idle" | "loading" | "done" | "http_error"
 
-export function MealsCard() {
+export function MealsCard({ className = "" }: { className?: string }) {
+  const { t } = useI18n()
   const [profiles, setProfiles] = useState<MealProfile[]>([])
   const [profileKey, setProfileKey] = useState("family")
   const [count, setCount] = useState(3)
@@ -31,6 +33,8 @@ export function MealsCard() {
   const [phase, setPhase] = useState(0)
   const seq = useRef(0)
 
+  const loadingPhases = [t("meals.loading1"), t("meals.loading2"), t("meals.loading3")]
+
   // profile editor dialog
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<MealProfile | null>(null) // null = create
@@ -41,7 +45,7 @@ export function MealsCard() {
 
   useEffect(() => {
     getMealProfiles().then(setProfiles).catch(() => setProfiles([]))
-    // Card defaults come from the settings dialog; ad-hoc changes stay local.
+    // Card defaults come from the settings page; ad-hoc changes stay local.
     getSettings().then((s) => {
       setProfileKey(s["meals.profile"])
       setCount(s["meals.count"])
@@ -52,9 +56,9 @@ export function MealsCard() {
 
   useEffect(() => {
     if (ui !== "loading") return
-    const t = setInterval(() => setPhase((p) => (p + 1) % LOADING_PHASES.length), 2500)
-    return () => clearInterval(t)
-  }, [ui])
+    const timer = setInterval(() => setPhase((p) => (p + 1) % loadingPhases.length), 2500)
+    return () => clearInterval(timer)
+  }, [ui, loadingPhases.length])
 
   const generate = async () => {
     const mySeq = ++seq.current
@@ -82,7 +86,7 @@ export function MealsCard() {
 
   const saveProfile = async () => {
     if (!draftName.trim() || !draftPrompt.trim()) {
-      setEditorError("Name and prompt are both required.")
+      setEditorError(t("meals.profile.required"))
       return
     }
     setSaving(true)
@@ -97,7 +101,7 @@ export function MealsCard() {
       setProfiles(await getMealProfiles())
       setEditorOpen(false)
     } catch {
-      setEditorError("Saving failed — is the backend reachable?")
+      setEditorError(t("meals.profile.saveFailed"))
     } finally {
       setSaving(false)
     }
@@ -105,7 +109,7 @@ export function MealsCard() {
 
   const removeProfile = async () => {
     if (!editing || editing.is_builtin) return
-    if (!window.confirm(`Delete the profile "${editing.name}"?`)) return
+    if (!window.confirm(t("meals.profile.deleteConfirm", { name: editing.name }))) return
     setSaving(true)
     try {
       await deleteMealProfile(editing.id)
@@ -113,7 +117,7 @@ export function MealsCard() {
       setProfiles(await getMealProfiles())
       setEditorOpen(false)
     } catch {
-      setEditorError("Deleting failed.")
+      setEditorError(t("meals.profile.deleteFailed"))
     } finally {
       setSaving(false)
     }
@@ -126,6 +130,7 @@ export function MealsCard() {
       onClick={onClick}
       disabled={ui === "loading"}
       title={title}
+      aria-pressed={active}
       className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
         active ? "border-primary/40 bg-primary/15 text-primary" : "border-border bg-secondary/40 text-muted-foreground hover:text-foreground"
       }`}
@@ -135,18 +140,17 @@ export function MealsCard() {
   )
 
   return (
-    <div className="hud-panel flex h-[420px] flex-col overflow-hidden">
-      <div className="flex items-center justify-between gap-2 border-b border-border p-4">
-        <div className="flex items-center gap-2">
-          <UtensilsCrossed className="h-4 w-4 text-primary" />
-          <div className="font-display text-sm font-bold tracking-wide text-foreground">MEAL IDEAS</div>
-        </div>
-        {result?.context && (
-          <span className="hud-label text-muted-foreground/70" title={`Ingredients from ${result.context.label}`}>
-            {result.context.mode === "trip" ? (result.context.widened ? "trip+" : "last trip") : "window"}
+    <div className={`hud-panel flex h-[420px] flex-col overflow-hidden ${className}`}>
+      <PanelHeader
+        icon={<UtensilsCrossed className="h-4 w-4 text-primary" aria-hidden />}
+        title={t("meals.title")}
+        right={result?.context ? (
+          <span className="hud-label text-muted-foreground/70" title={result.context.label}>
+            {result.context.mode === "trip" ? (result.context.widened ? "trip+" : t("meals.lastTrip")) : t("meals.daysWindow", { n: days })}
+            {result.context.pantry_items ? ` +${t("planning.pantry.title")}` : ""}
           </span>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {/* controls */}
       <div className="space-y-2 border-b border-border px-4 py-2.5">
@@ -162,33 +166,34 @@ export function MealsCard() {
               {profiles.map((p) => (
                 <SelectItem key={p.key} value={p.key} className="text-xs">{p.name}</SelectItem>
               ))}
-              <SelectItem value={NEW_PROFILE} className="text-xs text-primary">＋ New profile…</SelectItem>
+              <SelectItem value={NEW_PROFILE} className="text-xs text-primary">{t("meals.newProfile")}</SelectItem>
             </SelectContent>
           </Select>
           <button
             onClick={() => currentProfile && openEditor(currentProfile)}
             disabled={!currentProfile}
-            title="Edit this profile's prompt"
+            title={t("meals.editProfile")}
+            aria-label={t("meals.editProfile")}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-secondary/40 text-muted-foreground hover:text-foreground disabled:opacity-40"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="h-3.5 w-3.5" aria-hidden />
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          {chip(quick, () => setQuick(!quick), "Quick")}
-          {chip(veg, () => setVeg(!veg), "Veggie")}
+          {chip(quick, () => setQuick(!quick), t("meals.quick"))}
+          {chip(veg, () => setVeg(!veg), t("meals.veggie"))}
           {chip(context === "trip", () => setContext(context === "trip" ? "days" : "trip"),
-            context === "trip" ? "Last trip" : `${days} days`,
-            "Ingredient context: your latest shopping trip per store, or a rolling window")}
+            context === "trip" ? t("meals.lastTrip") : t("meals.daysWindow", { n: days }),
+            t("meals.contextHint"))}
           <div className="ml-auto">
             <Select value={String(count)} onValueChange={(v) => setCount(Number(v))}>
-              <SelectTrigger className="h-7 w-[88px] border-border bg-secondary/40 text-xs">
+              <SelectTrigger className="h-7 w-[92px] border-border bg-secondary/40 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {[1, 2, 3, 4, 5, 6].map((n) => (
                   <SelectItem key={n} value={String(n)} className="text-xs">
-                    {n} idea{n > 1 ? "s" : ""}
+                    {t("meals.ideas", { n })}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -201,15 +206,13 @@ export function MealsCard() {
       <div className="flex-1 overflow-y-auto p-4">
         {ui === "idle" && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-            <p className="text-sm text-muted-foreground">
-              Ideas from what&apos;s already in the house — nothing happens until you ask.
-            </p>
+            <p className="text-sm text-muted-foreground">{t("meals.idle")}</p>
           </div>
         )}
 
         {ui === "loading" && (
-          <div className="space-y-3">
-            <p className="text-center text-xs text-muted-foreground">{LOADING_PHASES[phase]}</p>
+          <div className="space-y-3" role="status" aria-live="polite">
+            <p className="text-center text-xs text-muted-foreground">{loadingPhases[phase]}</p>
             {Array.from({ length: Math.min(count, 3) }).map((_, i) => (
               <div key={i} className="animate-pulse rounded-md bg-secondary/30 p-3">
                 <div className="h-3.5 w-2/5 rounded bg-secondary/80" />
@@ -221,25 +224,25 @@ export function MealsCard() {
 
         {ui === "http_error" && (
           <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
-            Couldn&apos;t reach the kitchen — request failed or was rate-limited. Try again in a minute.
+            {t("meals.httpError")}
           </div>
         )}
 
         {ui === "done" && result?.status === "llm_error" && (
           <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
-            The LLM didn&apos;t answer — provider error, not an empty pantry. Try again shortly.
+            {t("meals.llmError")}
           </div>
         )}
 
         {ui === "done" && result?.status === "no_ingredients" && (
           <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
-            No recent food purchases to cook from — import some receipts first.
+            {t("meals.noIngredients")}
           </div>
         )}
 
         {ui === "done" && result?.status === "ok" && result.meals.length === 0 && (
           <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
-            Nothing came back — try fewer constraints or another profile.
+            {t("meals.nothing")}
           </div>
         )}
 
@@ -250,18 +253,18 @@ export function MealsCard() {
                 <div className="flex items-baseline justify-between gap-2">
                   <div className="text-sm font-semibold text-foreground">{m.title}</div>
                   {m.time_minutes ? (
-                    <span className="hud-label shrink-0 text-muted-foreground/70">~{m.time_minutes} min</span>
+                    <span className="hud-label shrink-0 text-muted-foreground/70">{t("meals.min", { n: m.time_minutes })}</span>
                   ) : null}
                 </div>
                 {m.uses?.length > 0 && (
                   <div className="mt-1 text-xs text-muted-foreground">
                     {m.uses.slice(0, 6).join(" · ")}
-                    {m.uses.length > 6 && ` · +${m.uses.length - 6} more`}
+                    {m.uses.length > 6 && ` · +${m.uses.length - 6}`}
                   </div>
                 )}
                 {m.missing && m.missing.length > 0 && (
                   <div className="mt-1 text-xs text-muted-foreground/90">
-                    <span className="text-primary/80">still needed:</span> {m.missing.slice(0, 5).join(", ")}
+                    <span className="text-primary/80">{t("meals.stillNeeded")}</span> {m.missing.slice(0, 5).join(", ")}
                   </div>
                 )}
                 {m.note && <div className="mt-1 text-xs text-muted-foreground/80">{m.note}</div>}
@@ -283,7 +286,7 @@ export function MealsCard() {
           disabled={ui === "loading"}
           className="w-full rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
         >
-          {ui === "loading" ? "Thinking…" : result ? "Suggest again" : "Suggest meals"}
+          {ui === "loading" ? t("meals.thinking") : result ? t("meals.again") : t("meals.suggest")}
         </button>
       </div>
 
@@ -291,30 +294,25 @@ export function MealsCard() {
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>{editing ? `Edit “${editing.name}”` : "New meal profile"}</DialogTitle>
-            <DialogDescription>
-              This text steers the suggestions. Your groceries, the Quick/Veggie
-              constraints and the output format are added automatically.
-            </DialogDescription>
+            <DialogTitle>{editing ? t("meals.profile.editTitle", { name: editing.name }) : t("meals.profile.newTitle")}</DialogTitle>
+            <DialogDescription>{t("meals.profile.desc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <Input
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
-              placeholder="Name, e.g. Meal-prep Sunday"
+              placeholder={t("meals.profile.namePlaceholder")}
               maxLength={60}
             />
             <Textarea
               value={draftPrompt}
               onChange={(e) => setDraftPrompt(e.target.value)}
-              placeholder="Instructions for the cook, e.g. High-protein dinners, no pork, everything freezable…"
+              placeholder={t("meals.profile.promptPlaceholder")}
               rows={8}
               maxLength={4000}
             />
             {editing?.is_builtin && (
-              <p className="text-xs text-muted-foreground">
-                Built-in profile: the prompt is yours to edit, but it can&apos;t be deleted.
-              </p>
+              <p className="text-xs text-muted-foreground">{t("meals.profile.builtin")}</p>
             )}
             {editorError && <p className="text-xs text-destructive">{editorError}</p>}
           </div>
@@ -325,7 +323,7 @@ export function MealsCard() {
                 disabled={saving}
                 className="rounded-md border border-destructive/40 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
               >
-                Delete
+                {t("common.delete")}
               </button>
             ) : <span />}
             <button
@@ -333,7 +331,7 @@ export function MealsCard() {
               disabled={saving}
               className="rounded-md border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
             >
-              {saving ? "Saving…" : "Save"}
+              {saving ? t("common.saving") : t("common.save")}
             </button>
           </DialogFooter>
         </DialogContent>

@@ -3,6 +3,9 @@ import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { AppShell } from "@/components/shell/AppShell";
+import { DataProvider, FiltersProvider, JobsProvider } from "@/lib/app-state";
+import { I18nProvider } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -19,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body
         className={cn(
           "min-h-screen bg-background font-sans antialiased app-grid-bg",
@@ -30,11 +33,20 @@ export default function RootLayout({
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
-          enableSystem={false}
+          themes={["light", "dark", "hc"]}
+          enableSystem
           disableTransitionOnChange
         >
-          {children}
-          <Toaster position="bottom-right" richColors />
+          <I18nProvider>
+            <DataProvider>
+              <JobsProvider>
+                <FiltersProvider>
+                  <AppShell>{children}</AppShell>
+                  <Toaster position="bottom-right" richColors />
+                </FiltersProvider>
+              </JobsProvider>
+            </DataProvider>
+          </I18nProvider>
         </ThemeProvider>
       </body>
     </html>

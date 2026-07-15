@@ -91,13 +91,53 @@ export function categoryColor(name: string, index = 0): string {
   return CATEGORY_COLORS[name] ?? CATEGORY_FALLBACK[index % CATEGORY_FALLBACK.length];
 }
 
-// --- Shared chart chrome ---
-export const CHART = {
-  axis: "#7b8794",                    // muted axis tick labels
-  grid: "rgba(150,170,190,0.10)",     // faint neutral grid lines
-  line: "#7aa07a",                    // primary line/dot color (sage)
-  lineFrom: "#6b8cae",                // line gradient start (slate blue)
-  lineTo: "#7aa07a",                  // line gradient end (sage)
-  lineActive: "#8cb08c",              // active dot
-  pieStroke: "#141b26",               // gap between pie slices (page bg)
-} as const;
+// --- Shared chart chrome (recharts needs explicit values, not CSS vars) ---
+// One palette per theme; components read the active one via useChartTheme().
+export interface ChartChrome {
+  axis: string;        // muted axis tick labels
+  grid: string;        // faint neutral grid lines
+  line: string;        // primary line/dot color (sage)
+  lineFrom: string;    // line gradient start (slate blue)
+  lineTo: string;      // line gradient end (sage)
+  lineActive: string;  // active dot
+  pieStroke: string;   // gap between pie slices (page bg)
+  cursor: string;      // hover cursor line/fill
+}
+
+export const CHART_THEMES: Record<string, ChartChrome> = {
+  dark: {
+    axis: "#7b8794",
+    grid: "rgba(150,170,190,0.10)",
+    line: "#7aa07a",
+    lineFrom: "#6b8cae",
+    lineTo: "#7aa07a",
+    lineActive: "#8cb08c",
+    pieStroke: "#141b26",
+    cursor: "rgba(122,160,122,0.45)",
+  },
+  light: {
+    axis: "#5d6a7a",
+    grid: "rgba(40,60,85,0.10)",
+    line: "#55805c",
+    lineFrom: "#5a7d9e",
+    lineTo: "#55805c",
+    lineActive: "#4a7351",
+    pieStroke: "#eef1f4",
+    cursor: "rgba(85,128,92,0.45)",
+  },
+  hc: {
+    axis: "#c3ccd6",
+    grid: "rgba(255,255,255,0.22)",
+    line: "#8fd694",
+    lineFrom: "#8ab8e8",
+    lineTo: "#8fd694",
+    lineActive: "#a5e8aa",
+    pieStroke: "#000000",
+    cursor: "rgba(143,214,148,0.6)",
+  },
+};
+
+// Back-compat constant (dark) for non-hook contexts.
+export const CHART = CHART_THEMES.dark;
+
+// (client hook lives in use-chart-theme.ts to keep this file server-safe)
