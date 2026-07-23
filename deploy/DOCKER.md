@@ -73,6 +73,10 @@ docker compose logs -f telegram      # message the bot; it replies with your cha
 Put that id in `TELEGRAM_ALLOWED_CHAT_IDS`, then
 `docker compose --profile telegram up -d --force-recreate telegram`.
 
+Once the bot container exists, the auto-deploy (section 4) detects it and
+includes the profile on every update — the bot gets rebuilt and recreated
+together with the other services, no manual recreate needed.
+
 ## 4. Auto-deploy (optional CD)
 
 Let the box deploy itself: a systemd timer polls GitHub every 5 minutes and

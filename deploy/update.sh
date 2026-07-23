@@ -41,5 +41,13 @@ fi
 
 echo "Deploying ${REMOTE:0:7} (CI green)."
 git merge --ff-only origin/main
-docker compose up -d --build
+# Profiled services are invisible to a plain `compose up`, so an active bot
+# would keep running its pre-deploy image forever. Include the profile
+# whenever the container exists on this box; boxes without the bot stay
+# bot-free.
+if docker ps -a --format '{{.Names}}' | grep -q '^bonfire-telegram$'; then
+    docker compose --profile telegram up -d --build
+else
+    docker compose up -d --build
+fi
 echo "Deployed ${REMOTE:0:7}."
