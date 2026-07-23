@@ -18,9 +18,9 @@ from ..api_utils import clamp_limit, clamp_page, parse_dt
 from ..categories import VALID_CATEGORIES
 from ..database import DATA_DIR, get_session
 from ..ingest import ARCHIVE_DIR, TOTAL_MISMATCH_TOLERANCE
-from ..jobs import start_reprocess
+from ..jobs import close_review_jobs, start_reprocess
 from ..models import CategoryMap, ImportJob, Item, Receipt
-from ..products import clean_name, normalize_key, resolve_product
+from ..products import clean_name, get_or_create_product, normalize_key, resolve_product
 from ..schemas import CategoryUpdate, ItemCreate, ItemUpdate, ReceiptPublic, ReceiptUpdate
 
 router = APIRouter()
@@ -68,6 +68,8 @@ def _refresh_trust(session: Session, receipt: Receipt, touched_by_user: bool) ->
         receipt.review_status = "verified" if not warnings else "needs_review"
     elif warnings and receipt.review_status == "ok":
         receipt.review_status = "needs_review"
+    if receipt.review_status != "needs_review":
+        close_review_jobs(session, receipt.id)
 
 
 def _find_duplicates(session: Session, receipt: Receipt) -> list[Receipt]:
@@ -109,26 +111,35 @@ def _resolve_source_file(receipt: Receipt):
 
 
 def set_category_for_name(session: Session, item_name: str, new_category: str) -> int:
-    """Category change with 'all' scope: every existing item with this name,
-    the learned mapping (locked against LLM overrides), and the product."""
-    updated = 0
-    for item in session.exec(select(Item).where(Item.name == item_name)).all():
-        item.category = new_category
-        session.add(item)
-        updated += 1
-
-    key = normalize_key(item_name)
-    mapping = session.get(CategoryMap, key)
-    if mapping:
-        mapping.category = new_category
-        mapping.is_locked = True
-    else:
-        session.add(CategoryMap(item_key=key, category=new_category, is_locked=True))
-
+    """Category change with 'all' scope, same semantics as the products page:
+    the resolved product and ALL its lines (every merged spelling, not just
+    this one), with every affected name's mapping locked against LLM
+    overrides."""
+    items = list(session.exec(select(Item).where(Item.name == item_name)).all())
     product = resolve_product(session, item_name)
     if product:
         product.category = new_category
-    return updated
+        seen = {item.id for item in items}
+        items += [item for item in
+                  session.exec(select(Item).where(Item.product_id == product.id)).all()
+                  if item.id not in seen]
+
+    names = {item.name for item in items} | {item_name}
+    if product:
+        names.add(product.display_name)
+
+    for item in items:
+        item.category = new_category
+        session.add(item)
+    for name in names:
+        key = normalize_key(name)
+        mapping = session.get(CategoryMap, key)
+        if mapping:
+            mapping.category = new_category
+            mapping.is_locked = True
+        else:
+            session.add(CategoryMap(item_key=key, category=new_category, is_locked=True))
+    return len(items)
 
 
 # --------------------------------------------------------------------------- #
@@ -327,6 +338,9 @@ def verify_receipt(receipt_id: int, session: Session = Depends(get_session)):
     """Mark a receipt as human-checked, warnings and all."""
     receipt = _get_receipt_or_404(session, receipt_id)
     receipt.review_status = "verified"
+    # The imports feed shows the *job* status — approving the receipt must not
+    # leave its import stuck at "needs review".
+    close_review_jobs(session, receipt_id)
     session.commit()
     return {"receipt": ReceiptPublic.from_receipt(receipt)}
 
@@ -350,7 +364,9 @@ def delete_receipt(receipt_id: int, session: Session = Depends(get_session)):
     receipt = _get_receipt_or_404(session, receipt_id)
     for item in session.exec(select(Item).where(Item.receipt_id == receipt_id)).all():
         session.delete(item)
-    # Import history survives, but must not point at a dead row.
+    # A deleted receipt can never be reviewed — close stale flags, then keep
+    # the import history without pointing at a dead row.
+    close_review_jobs(session, receipt_id)
     for job in session.exec(select(ImportJob).where(ImportJob.receipt_id == receipt_id)).all():
         job.receipt_id = None
     session.delete(receipt)
@@ -385,12 +401,18 @@ def add_item(receipt_id: int, data: ItemCreate, session: Session = Depends(get_s
                            price_total=data.price_total, price_single=data.price_single,
                            category=data.category)
     name = data.name.strip()
-    category = data.category or "Uncategorized"
 
+    # Manually added lines join the product layer like imported ones do; with
+    # no explicit category the line follows its product.
     product = resolve_product(session, name)
+    if product is not None:
+        category = data.category or product.category
+    else:
+        category = data.category or "Uncategorized"
+        product = get_or_create_product(session, name, category)
     item = Item(
         receipt_id=receipt.id,
-        product_id=product.id if product else None,
+        product_id=product.id,
         name=name,
         clean_name=clean_name(name),
         category=category,
@@ -425,9 +447,15 @@ def update_item(receipt_id: int, item_id: int, data: ItemUpdate,
         name = data.name.strip()
         item.name = name
         item.clean_name = clean_name(name)
-        # Relink to the (possibly different) canonical product.
+        # Relink to the (possibly different) canonical product; the line
+        # follows its new product's category. Unknown names get a product,
+        # like imported lines do.
         product = resolve_product(session, name)
-        item.product_id = product.id if product else None
+        if product is not None:
+            item.category = product.category
+        else:
+            product = get_or_create_product(session, name, item.category)
+        item.product_id = product.id
     if data.quantity is not None:
         item.quantity = float(data.quantity)
     if data.price_total is not None:
@@ -435,7 +463,7 @@ def update_item(receipt_id: int, item_id: int, data: ItemUpdate,
         item.is_discounted = item.price_total < 0
     if data.price_single is not None:
         item.price_single = round(float(data.price_single), 2)
-    elif data.price_total is not None and item.quantity:
+    elif (data.price_total is not None or data.quantity is not None) and item.quantity:
         item.price_single = round(item.price_total / item.quantity, 2)
 
     updated_items = 1

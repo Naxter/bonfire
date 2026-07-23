@@ -9,6 +9,7 @@ identity layer:
   * ``clean_name``     — the name with the size tokens stripped
   * ``unit_price``     — price normalized to €/kg, €/l or €/piece
   * ``merge_products`` — collapse duplicate products, remembered via aliases
+  * ``split_product``  — undo a merge for one alias (the escape hatch)
   * ``resolve_product``— alias-aware lookup used by the ingest pipeline
 """
 
@@ -18,7 +19,7 @@ import re
 
 from sqlmodel import Session, select
 
-from .models import Item, Product, ProductAlias
+from .models import CategoryMap, Item, Product, ProductAlias
 
 # --------------------------------------------------------------------------- #
 # Size parsing
@@ -134,14 +135,48 @@ def resolve_product(session: Session, name: str) -> Product | None:
     return session.exec(select(Product).where(Product.name_key == key)).first()
 
 
+def get_or_create_product(session: Session, name: str, category: str) -> Product:
+    """Resolve the canonical product for an item name — honoring merge aliases —
+    creating it on first sight (with a best-effort package size) and keeping
+    its category current."""
+    product = resolve_product(session, name)
+    if product is None:
+        size = parse_size(name)
+        product = Product(
+            name_key=normalize_key(name),
+            display_name=name,
+            category=category,
+            size_value=size[0] if size else None,
+            size_unit=size[1] if size else None,
+        )
+        session.add(product)
+        session.flush()  # assign product.id
+    elif product.category != category:
+        product.category = category
+    return product
+
+
+def _lock_category_mapping(session: Session, key: str, category: str) -> None:
+    """Pin a name→category mapping so future imports (and the LLM
+    recategorizer) can't reintroduce a category drift."""
+    mapping = session.get(CategoryMap, key)
+    if mapping:
+        mapping.category = category
+        mapping.is_locked = True
+    else:
+        session.add(CategoryMap(item_key=key, category=category, is_locked=True))
+
+
 def merge_products(session: Session, target_id: int, source_ids: list[int]) -> dict:
     """Merge ``source_ids`` into ``target_id``.
 
     Items are re-pointed at the target; each source's name_key (and any
     aliases it already collected) becomes an alias of the target so future
-    imports resolve to the merged product. Missing identity fields (brand,
-    size) are inherited from the first source that has them. Sources are
-    deleted. Caller commits."""
+    imports resolve to the merged product. Moved items adopt the target's
+    category (a product's purchases all count in one category), and the
+    merged name mappings are locked to it so the next import doesn't drift
+    apart again. Missing identity fields (brand, size) are inherited from
+    the first source that has them. Sources are deleted. Caller commits."""
     target = session.get(Product, target_id)
     if target is None:
         raise ValueError("Target product not found.")
@@ -157,15 +192,20 @@ def merge_products(session: Session, target_id: int, source_ids: list[int]) -> d
 
         for item in session.exec(select(Item).where(Item.product_id == sid)).all():
             item.product_id = target_id
+            item.category = target.category
             moved_items += 1
 
         # The source's own key + everything already aliased to it.
+        merged_keys = {source.name_key}
         for alias in session.exec(
             select(ProductAlias).where(ProductAlias.product_id == sid)
         ).all():
             alias.product_id = target_id
+            merged_keys.add(alias.name_key)
         if session.get(ProductAlias, source.name_key) is None:
             session.add(ProductAlias(name_key=source.name_key, product_id=target_id))
+        for key in merged_keys:
+            _lock_category_mapping(session, key, target.category)
 
         if target.brand is None and source.brand:
             target.brand = source.brand
@@ -176,3 +216,40 @@ def merge_products(session: Session, target_id: int, source_ids: list[int]) -> d
         session.delete(source)
 
     return {"target_id": target_id, "merged_keys": merged, "moved_items": moved_items}
+
+
+def split_product(session: Session, product_id: int, name_key: str) -> dict:
+    """Undo a merge for one alias: recreate a product for ``name_key``, move
+    its receipt lines back, drop the alias (so future imports separate again).
+    Caller commits."""
+    product = session.get(Product, product_id)
+    if product is None:
+        raise ValueError("Product not found.")
+    alias = session.get(ProductAlias, name_key)
+    if alias is None or alias.product_id != product_id:
+        raise ValueError("This name is not a merged alias of the product.")
+
+    items = [
+        item
+        for item in session.exec(select(Item).where(Item.product_id == product_id)).all()
+        if normalize_key(item.name) == name_key
+    ]
+
+    # Same identity rules as first-time ingest: raw name, best-effort size.
+    display = items[0].name if items else name_key
+    size = parse_size(display)
+    restored = Product(
+        name_key=name_key,
+        display_name=display,
+        category=items[0].category if items else product.category,
+        size_value=size[0] if size else None,
+        size_unit=size[1] if size else None,
+    )
+    session.add(restored)
+    session.flush()  # assign restored.id
+
+    for item in items:
+        item.product_id = restored.id
+    session.delete(alias)
+
+    return {"product_id": restored.id, "name_key": name_key, "moved_items": len(items)}

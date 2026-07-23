@@ -8,10 +8,10 @@
 
 import { useEffect, useState } from "react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
-import { Boxes, ChevronLeft, ChevronRight, Merge, Search, TrendingUp } from "lucide-react"
+import { Boxes, ChevronLeft, ChevronRight, Merge, Search, Split, TrendingUp } from "lucide-react"
 import {
   errorDetail, getPriceAlerts, getProductDetail, getProducts, mergeProducts,
-  updateProduct, type ProductDetail, type ProductRow, type UnitPrice,
+  splitProduct, updateProduct, type ProductDetail, type ProductRow, type UnitPrice,
 } from "@/lib/api"
 import { useApi, useDataVersion } from "@/lib/app-state"
 import { useI18n } from "@/lib/i18n"
@@ -115,6 +115,22 @@ function ProductDialog({ productId, onClose, onChanged }: {
     }
   }
 
+  const unmerge = async (nameKey: string) => {
+    if (!detail) return
+    setBusy(true)
+    try {
+      const productId = detail.product.id
+      await splitProduct(productId, nameKey)
+      toast.success(t("products.split.done", { name: nameKey }))
+      onChanged()
+      setDetail(await getProductDetail(productId))
+    } catch (err) {
+      toast.error(errorDetail(err) || t("common.error"))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const history = (detail?.history ?? []).map((h) => ({ ...h, label: fmtDate(h.date, "short") }))
 
   return (
@@ -202,17 +218,46 @@ function ProductDialog({ productId, onClose, onChanged }: {
               </div>
             )}
 
-            {/* Aliases */}
-            {(detail.aliases.length > 0 || detail.receipt_names.length > 1) && (
+            {/* Merged names — each one can be split back into its own product */}
+            {detail.aliases.length > 0 && (
               <div>
-                <div className="hud-label mb-1">{t("products.detail.aliases")}</div>
+                <div className="hud-label mb-1">{t("products.detail.merged")}</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {[...new Set([...detail.receipt_names, ...detail.aliases])].map((name) => (
-                    <span key={name} className="rounded bg-secondary/50 px-1.5 py-0.5 text-xs text-muted-foreground">{name}</span>
+                  {detail.aliases.map((key) => (
+                    <span key={key} className="flex items-center gap-1 rounded bg-secondary/50 py-0.5 pl-1.5 pr-1 text-xs text-muted-foreground">
+                      {key}
+                      <button
+                        type="button"
+                        onClick={() => unmerge(key)}
+                        disabled={busy}
+                        title={t("products.split.hint")}
+                        aria-label={`${t("products.split")}: ${key}`}
+                        className="rounded p-0.5 hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                      >
+                        <Split className="h-3 w-3" aria-hidden />
+                      </button>
+                    </span>
                   ))}
                 </div>
               </div>
             )}
+
+            {/* Receipt spellings that resolve here on their own (not mergeable apart) */}
+            {(() => {
+              const plain = detail.receipt_names.filter(
+                (n) => !detail.aliases.includes(n.toLowerCase().trim()),
+              )
+              return plain.length > 1 ? (
+                <div>
+                  <div className="hud-label mb-1">{t("products.detail.aliases")}</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {plain.map((name) => (
+                      <span key={name} className="rounded bg-secondary/50 px-1.5 py-0.5 text-xs text-muted-foreground">{name}</span>
+                    ))}
+                  </div>
+                </div>
+              ) : null
+            })()}
           </div>
         )}
         <DialogFooter>

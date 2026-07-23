@@ -22,9 +22,9 @@ from sqlmodel import Session, select
 
 from .categorizer import get_category
 from .database import DATA_DIR, engine
-from .models import Item, Product, Receipt
+from .models import Item, Receipt
 from .pdf_utils import extract_text_from_pdf
-from .products import clean_name, normalize_key, parse_size, resolve_product
+from .products import clean_name, get_or_create_product
 from .stores import ParsedReceipt, detect, get_adapter, list_stores
 
 logger = logging.getLogger(__name__)
@@ -173,27 +173,6 @@ def validate_parsed(parsed: ParsedReceipt) -> list[str]:
     return warnings
 
 
-def _get_or_create_product(session: Session, name: str, category: str) -> Product:
-    """Resolve the canonical product for an item name — honoring merge aliases —
-    creating it on first sight (with a best-effort package size) and keeping
-    its category current."""
-    product = resolve_product(session, name)
-    if product is None:
-        size = parse_size(name)
-        product = Product(
-            name_key=normalize_key(name),
-            display_name=name,
-            category=category,
-            size_value=size[0] if size else None,
-            size_unit=size[1] if size else None,
-        )
-        session.add(product)
-        session.flush()  # assign product.id
-    elif product.category != category:
-        product.category = category
-    return product
-
-
 def _persist(parsed: ParsedReceipt, filename: str, content_hash: str | None = None,
              source_path: str | None = None,
              extraction_source: str = "pdf_adapter",
@@ -280,7 +259,7 @@ def _insert_items(session: Session, receipt_id: int, parsed: ParsedReceipt) -> N
         else:
             category = get_category(line.name, session=session)
 
-        product = _get_or_create_product(session, line.name, category)
+        product = get_or_create_product(session, line.name, category)
         session.add(Item(
             receipt_id=receipt_id,
             product_id=product.id,

@@ -79,6 +79,19 @@ def update_job(job_id: int, **fields) -> None:
         session.commit()
 
 
+def close_review_jobs(session: Session, receipt_id: int) -> None:
+    """A receipt left the review queue (verified, corrected or deleted): its
+    import jobs must not keep saying "needs review" in the feed. Caller
+    commits."""
+    for job in session.exec(
+        select(ImportJob).where(ImportJob.receipt_id == receipt_id,
+                                ImportJob.status == "needs_review")
+    ).all():
+        job.status = "done"
+        if job.message:
+            job.message = job.message.replace(" (needs review)", "")
+
+
 def _prune(session: Session) -> None:
     """Drop ancient finished jobs (best effort, called on create)."""
     cutoff = datetime.now() - timedelta(days=_PRUNE_AFTER_DAYS)
@@ -216,6 +229,12 @@ def _reprocess_worker(job_id: int, receipt_id: int, path: str,
                    message=_message_for(report),
                    error=report.error,
                    detail={"ingest_status": report.status, "warnings": report.warnings})
+        # A clean reprocess resolves the review — earlier jobs for this
+        # receipt must not keep flagging it.
+        if report.status == "stored" and report.review_status != "needs_review":
+            with Session(engine) as session:
+                close_review_jobs(session, receipt_id)
+                session.commit()
     except Exception as e:
         logger.exception("Reprocess job %s crashed for receipt %s", job_id, receipt_id)
         update_job(job_id, status="failed", error=f"Unexpected error: {e}")

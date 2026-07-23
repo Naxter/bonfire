@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from app import ingest
-from app.models import CategoryMap, Item, Receipt
+from app.models import CategoryMap, ImportJob, Item, Product, Receipt
 from app.stores.base import ParsedItem, ParsedReceipt
 from sqlmodel import Session, select
 
@@ -138,3 +138,82 @@ def test_verify_endpoint(api_engine, client):
     r = client.post(f"/receipts/{receipt_id}/verify")
     assert r.status_code == 200
     assert r.json()["receipt"]["review_status"] == "verified"
+
+
+def _needs_review_job(engine, receipt_id):
+    with Session(engine) as session:
+        job = ImportJob(kind="upload", status="needs_review", receipt_id=receipt_id,
+                        message="REWE — 2 items, €99.00 (needs review)")
+        session.add(job)
+        session.commit()
+        return job.id
+
+
+def test_verify_flips_import_job_status(api_engine, client):
+    receipt_id = _persist(api_engine, total=99.0, content_hash="h14").receipt_id
+    job_id = _needs_review_job(api_engine, receipt_id)
+
+    assert client.post(f"/receipts/{receipt_id}/verify").status_code == 200
+    with Session(api_engine) as session:
+        job = session.get(ImportJob, job_id)
+        assert job.status == "done"
+        assert job.message == "REWE — 2 items, €99.00"
+
+
+def test_receipt_correction_closes_review_jobs(api_engine, client):
+    """Fixing the numbers in the edit dialog resolves the review — the feed
+    row must not keep saying "needs review"."""
+    receipt_id = _persist(api_engine, total=99.0, content_hash="h15").receipt_id
+    job_id = _needs_review_job(api_engine, receipt_id)
+
+    r = client.patch(f"/receipts/{receipt_id}", json={"total_amount": 3.48})
+    assert r.json()["receipt"]["review_status"] == "verified"
+    with Session(api_engine) as session:
+        job = session.get(ImportJob, job_id)
+        assert job.status == "done"
+        assert "(needs review)" not in job.message
+
+
+def test_delete_receipt_closes_review_jobs(api_engine, client):
+    """A deleted receipt can never be reviewed — no eternal "needs review"
+    rows in the feed."""
+    receipt_id = _persist(api_engine, total=99.0, content_hash="h16").receipt_id
+    job_id = _needs_review_job(api_engine, receipt_id)
+
+    assert client.delete(f"/receipts/{receipt_id}").status_code == 200
+    with Session(api_engine) as session:
+        job = session.get(ImportJob, job_id)
+        assert job.status == "done"
+        assert job.receipt_id is None
+
+
+def test_quantity_edit_recomputes_price_single(api_engine, client):
+    receipt_id = _persist(api_engine, content_hash="h17").receipt_id
+    with Session(api_engine) as session:
+        item = session.exec(select(Item).where(Item.name == "Banane")).one()
+    client.patch(f"/receipts/{receipt_id}/items/{item.id}", json={"price_total": 3.0})
+    r = client.patch(f"/receipts/{receipt_id}/items/{item.id}", json={"quantity": 2})
+    assert r.json()["item"]["price_single"] == 1.5
+
+
+def test_added_and_renamed_items_join_product_layer(api_engine, client):
+    receipt_id = _persist(api_engine, content_hash="h18").receipt_id
+
+    # A brand-new name gets its own product immediately (like an import would).
+    r = client.post(f"/receipts/{receipt_id}/items",
+                    json={"name": "Kürbiskerne 200g", "price_total": 3.49, "quantity": 1})
+    created = r.json()["item"]
+    assert created["product_id"] is not None
+    with Session(api_engine) as session:
+        product = session.get(Product, created["product_id"])
+        assert product.name_key == "kürbiskerne 200g"
+        assert (product.size_value, product.size_unit) == (200.0, "g")
+
+    # Renaming a line onto an existing product makes it follow that
+    # product's category.
+    client.put("/categories/update",
+               json={"item_name": "Milch", "new_category": "Molkereiprodukte & Eier"})
+    with Session(api_engine) as session:
+        banane = session.exec(select(Item).where(Item.name == "Banane")).one()
+    r = client.patch(f"/receipts/{receipt_id}/items/{banane.id}", json={"name": "Milch"})
+    assert r.json()["item"]["category"] == "Molkereiprodukte & Eier"

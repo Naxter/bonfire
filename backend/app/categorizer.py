@@ -6,7 +6,8 @@ from sqlmodel import Session, select
 from .categories import VALID_CATEGORIES
 from .database import engine
 from .llm import complete
-from .models import CategoryMap, Item, Product
+from .models import CategoryMap, Item
+from .products import resolve_product
 
 logger = logging.getLogger(__name__)
 
@@ -120,8 +121,9 @@ def recategorize(scope: str = "missing") -> dict:
             else:
                 session.add(CategoryMap(item_key=key, category=new_cat))
 
-            # Keep the canonical product in sync with the new category.
-            product = session.exec(select(Product).where(Product.name_key == key)).first()
+            # Keep the canonical product in sync with the new category
+            # (alias-aware: merged spellings must reach the surviving product).
+            product = resolve_product(session, name)
             if product and product.category != new_cat:
                 product.category = new_cat
 

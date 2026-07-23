@@ -106,7 +106,11 @@ def get_top_products(mode: str = "all", year: str = None, month: str = None, sto
                      start: str = None, end: str = None, category: str = None,
                      limit: int = 50,
                      session: Session = Depends(get_session)):
-    """Most frequently bought products, tagged with their store badge."""
+    """Most frequently bought products, tagged with their store badge.
+
+    Grouped by the raw receipt name: within one chain the receipt text is
+    per-article and stable, so this stays truthful even when a product-layer
+    merge is wrong. Curate identity on the products page instead."""
     limit = clamp_limit(limit, cap=100)
     query = apply_store_filter(
         select(
@@ -136,10 +140,14 @@ def get_top_products(mode: str = "all", year: str = None, month: str = None, sto
 
 
 @router.get("/stats/price-volatility")
-def get_price_volatility(store: str = "all", limit: int = 200,
+def get_price_volatility(store: str = "all", limit: int = 1000,
                          session: Session = Depends(get_session)):
-    """Items whose price has changed the most, with store badges."""
-    limit = clamp_limit(limit, cap=500)
+    """Items whose price has changed the most, with store badges.
+
+    Grouped by the raw receipt name (see top-products for the rationale).
+    The default limit is deliberately high: the client search box filters this
+    list, so an item must not silently fall off a short leaderboard."""
+    limit = clamp_limit(limit, cap=2000)
     query = apply_store_filter(
         select(
             Item.name,

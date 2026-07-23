@@ -119,6 +119,83 @@ def test_merge_moves_items_and_future_imports(api_engine, client):
         assert all(i.product_id == target.id for i in items)
 
 
+def test_merge_adopts_target_category_and_locks_mappings(api_engine, client):
+    _seed(api_engine, names=("MILCH 1L",), tx="t1", content_hash="h1")
+    _seed(api_engine, names=("MILCH FRISCH 1L",), tx="t2", content_hash="h2")
+    # Put the source in a different category, then merge across categories.
+    client.put("/categories/update",
+               json={"item_name": "MILCH FRISCH 1L", "new_category": "Getränke"})
+    with Session(api_engine) as session:
+        products = {p.name_key: p for p in session.exec(select(Product)).all()}
+        target_cat = products["milch 1l"].category
+    assert target_cat != "Getränke"
+
+    client.post("/products/merge", json={"target_id": products["milch 1l"].id,
+                                         "source_ids": [products["milch frisch 1l"].id]})
+    with Session(api_engine) as session:
+        # Moved purchases count where the surviving product counts.
+        item = session.exec(select(Item).where(Item.name == "MILCH FRISCH 1L")).one()
+        assert item.category == target_cat
+        # ...and the next import of that spelling can't reintroduce the drift.
+        mapping = session.get(CategoryMap, "milch frisch 1l")
+        assert mapping.category == target_cat and mapping.is_locked
+
+
+def test_recategorize_reaches_merged_spellings(api_engine, client):
+    """The receipts-door 'change everywhere' must cover the whole product,
+    exactly like the products-page door."""
+    _seed(api_engine, names=("MILCH 1L",), tx="t1", content_hash="h1")
+    _seed(api_engine, names=("MILCH FRISCH 1L",), tx="t2", content_hash="h2")
+    with Session(api_engine) as session:
+        products = {p.name_key: p for p in session.exec(select(Product)).all()}
+    client.post("/products/merge", json={"target_id": products["milch 1l"].id,
+                                         "source_ids": [products["milch frisch 1l"].id]})
+
+    r = client.put("/categories/update",
+                   json={"item_name": "MILCH 1L", "new_category": "Getränke"})
+    assert r.json()["updated_items"] == 2  # both spellings, not just the named one
+    with Session(api_engine) as session:
+        assert {i.category for i in session.exec(select(Item)).all()} == {"Getränke"}
+        assert session.get(Product, products["milch 1l"].id).category == "Getränke"
+        for key in ("milch 1l", "milch frisch 1l"):
+            mapping = session.get(CategoryMap, key)
+            assert mapping.category == "Getränke" and mapping.is_locked
+
+
+def test_split_undoes_a_merge(api_engine, client):
+    _seed(api_engine, names=("MILCH 1L",), tx="t1", content_hash="h1")
+    _seed(api_engine, names=("MILCH FRISCH 1L",), tx="t2", content_hash="h2")
+    with Session(api_engine) as session:
+        products = {p.name_key: p for p in session.exec(select(Product)).all()}
+    target = products["milch 1l"]
+    source = products["milch frisch 1l"]
+    client.post("/products/merge", json={"target_id": target.id, "source_ids": [source.id]})
+
+    r = client.post(f"/products/{target.id}/split", json={"name_key": "MILCH FRISCH 1L"})
+    assert r.status_code == 200
+    assert r.json()["moved_items"] == 1
+    restored_id = r.json()["product_id"]
+
+    with Session(api_engine) as session:
+        restored = session.get(Product, restored_id)
+        assert restored.name_key == "milch frisch 1l"
+        assert restored.display_name == "MILCH FRISCH 1L"
+        assert (restored.size_value, restored.size_unit) == (1000.0, "ml")
+        assert session.get(ProductAlias, "milch frisch 1l") is None
+        item = session.exec(select(Item).where(Item.name == "MILCH FRISCH 1L")).one()
+        assert item.product_id == restored_id
+
+    # Future imports of that spelling land on the restored product again.
+    _seed(api_engine, names=("MILCH FRISCH 1L",), tx="t3", content_hash="h3")
+    with Session(api_engine) as session:
+        items = session.exec(select(Item).where(Item.name == "MILCH FRISCH 1L")).all()
+        assert {i.product_id for i in items} == {restored_id}
+
+    # Splitting a name that is not an alias is a 404, not a crash.
+    assert client.post(f"/products/{target.id}/split",
+                       json={"name_key": "not an alias"}).status_code == 404
+
+
 def test_product_patch_validates(api_engine, client):
     _seed(api_engine, names=("MILCH 1L",))
     with Session(api_engine) as session:

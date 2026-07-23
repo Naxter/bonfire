@@ -48,6 +48,21 @@ def create_db_and_tables():
     _backfill_products()
     _backfill_source_paths()
     _backfill_product_sizes()
+    _sync_verified_import_jobs()
+
+
+def _sync_verified_import_jobs():
+    """Data repair: import jobs frozen at 'needs_review' whose receipt has
+    since left the review queue (verified, reprocessed clean, or deleted)
+    flip to 'done'. The correction endpoints keep the two in sync going
+    forward; this catches rows written before that fix."""
+    with engine.begin() as conn:
+        conn.execute(text(
+            "UPDATE importjob SET status = 'done', "
+            "message = replace(message, ' (needs review)', '') "
+            "WHERE status = 'needs_review' AND (receipt_id IS NULL OR receipt_id IN "
+            "(SELECT id FROM receipt WHERE review_status IN ('verified', 'ok')))"
+        ))
 
 
 def get_session():

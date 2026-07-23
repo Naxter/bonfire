@@ -564,6 +564,11 @@ export const mergeProducts = async (targetId: number, sourceIds: number[]) => {
     return response.data as { target_id: number; merged_keys: string[]; moved_items: number };
 };
 
+export const splitProduct = async (productId: number, nameKey: string) => {
+    const response = await api.post(`/products/${productId}/split`, { name_key: nameKey });
+    return response.data as { product_id: number; name_key: string; moved_items: number };
+};
+
 export interface PriceAlert {
     product_id: number; name: string; category: string; store: string; date: string;
     previous_price: number; latest_price: number; increase_pct: number;

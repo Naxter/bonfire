@@ -127,3 +127,7 @@ class ProductUpdate(SQLModel):
 class ProductMergeIn(SQLModel):
     target_id: int
     source_ids: list[int]
+
+
+class ProductSplitIn(SQLModel):
+    name_key: str

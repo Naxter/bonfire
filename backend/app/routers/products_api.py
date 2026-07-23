@@ -1,4 +1,4 @@
-"""Product identity APIs: browse, edit, merge, compare prices across stores.
+"""Product identity APIs: browse, edit, merge/unmerge, compare prices across stores.
 
 Products are the canonical layer over noisy receipt names. These endpoints
 expose them for curation (fix a name, set the package size, merge duplicates)
@@ -15,8 +15,8 @@ from ..api_utils import clamp_limit, clamp_page
 from ..categories import VALID_CATEGORIES
 from ..database import get_session
 from ..models import CategoryMap, Item, Product, ProductAlias, Receipt
-from ..products import merge_products, normalize_key, unit_price
-from ..schemas import ProductMergeIn, ProductUpdate
+from ..products import merge_products, normalize_key, split_product, unit_price
+from ..schemas import ProductMergeIn, ProductSplitIn, ProductUpdate
 from ..settings import get_settings
 from ..stores import store_display_name
 
@@ -251,6 +251,18 @@ def merge(data: ProductMergeIn, session: Session = Depends(get_session)):
         raise HTTPException(status_code=422, detail="At most 50 products per merge.")
     try:
         result = merge_products(session, data.target_id, data.source_ids)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+    session.commit()
+    return result
+
+
+@router.post("/products/{product_id}/split")
+def split(product_id: int, data: ProductSplitIn, session: Session = Depends(get_session)):
+    """Undo a merge: detach one aliased receipt name into its own product
+    (purchases move back with it; future imports stay separate)."""
+    try:
+        result = split_product(session, product_id, normalize_key(data.name_key))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
     session.commit()
