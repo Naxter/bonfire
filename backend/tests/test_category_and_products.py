@@ -162,6 +162,20 @@ def test_recategorize_reaches_merged_spellings(api_engine, client):
             assert mapping.category == "Getränke" and mapping.is_locked
 
 
+def test_product_search_matches_merged_aliases(api_engine, client):
+    _seed(api_engine, names=("MILCH 1L",), tx="t1", content_hash="h1")
+    _seed(api_engine, names=("MILCH FRISCH 1L",), tx="t2", content_hash="h2")
+    with Session(api_engine) as session:
+        products = {p.name_key: p for p in session.exec(select(Product)).all()}
+    client.post("/products/merge", json={"target_id": products["milch 1l"].id,
+                                         "source_ids": [products["milch frisch 1l"].id]})
+
+    # The merged-away spelling still finds the surviving product.
+    r = client.get("/products?search=FRISCH").json()
+    assert [p["display_name"] for p in r["items"]] == ["MILCH 1L"]
+    assert r["total"] == 1
+
+
 def test_split_undoes_a_merge(api_engine, client):
     _seed(api_engine, names=("MILCH 1L",), tx="t1", content_hash="h1")
     _seed(api_engine, names=("MILCH FRISCH 1L",), tx="t2", content_hash="h2")

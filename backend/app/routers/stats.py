@@ -15,6 +15,11 @@ from ..stores import store_display_name
 
 router = APIRouter()
 
+# Money-flow line items (deposits, deposit returns, vouchers) — real receipt
+# lines, but not groceries. The default top-products view hides them; an
+# explicit category pick (e.g. tapping the Pfand pie slice) still shows them.
+_MONEY_FLOW_CATEGORIES = ("Pfand", "Gutscheine & Rabatte")
+
 
 @router.get("/stats/dashboard")
 def get_dashboard_stats(store: str = "all", session: Session = Depends(get_session)):
@@ -104,14 +109,18 @@ def get_category_spending(mode: str = "all", month: str = None, week: str = None
 @router.get("/stats/top-products")
 def get_top_products(mode: str = "all", year: str = None, month: str = None, store: str = "all",
                      start: str = None, end: str = None, category: str = None,
-                     limit: int = 50,
+                     limit: int = 1000,
                      session: Session = Depends(get_session)):
     """Most frequently bought products, tagged with their store badge.
 
     Grouped by the raw receipt name: within one chain the receipt text is
     per-article and stable, so this stays truthful even when a product-layer
-    merge is wrong. Curate identity on the products page instead."""
-    limit = clamp_limit(limit, cap=100)
+    merge is wrong. Curate identity on the products page instead.
+
+    Like price-volatility, the default limit is high on purpose: the client
+    search box filters this list, so a product bought a handful of times must
+    not silently fall off a short leaderboard."""
+    limit = clamp_limit(limit, cap=2000)
     query = apply_store_filter(
         select(
             Item.name,
@@ -124,6 +133,8 @@ def get_top_products(mode: str = "all", year: str = None, month: str = None, sto
 
     if category and category != "all":
         query = query.where(Item.category == category)
+    else:
+        query = query.where(Item.category.notin_(_MONEY_FLOW_CATEGORIES))
 
     if mode == "year" and year:
         query = query.where(func.strftime("%Y", Receipt.date) == year)

@@ -244,6 +244,7 @@ export const de: Record<string, string> = {
   "products.detail.aliases": "Auch importiert als",
   "products.detail.edit": "Produkt bearbeiten",
   "products.updated": "Produkt aktualisiert.",
+  "products.totalQty": "{n} Stk gesamt",
   "products.alerts.title": "Preis-Alarme",
   "products.alerts.none": "Aktuell keine ungewöhnlichen Preissprünge.",
   "products.alerts.hint": "Letzter Preis vs. günstigster der letzten Käufe (Schwelle in den Einstellungen).",

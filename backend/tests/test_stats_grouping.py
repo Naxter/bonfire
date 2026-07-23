@@ -38,6 +38,19 @@ def test_volatility_groups_by_receipt_name(api_engine, client):
     assert [p["price"] for p in history] == [2.99, 3.19]
 
 
+def test_top_products_hide_money_flow_lines_by_default(api_engine, client):
+    _persist_one(api_engine, "Apfelschorle", 1.06, 1, "d1")
+    _persist_one(api_engine, "LEERGUT EINWEG", -0.25, 2, "d2")  # deposit return
+
+    names = [r["name"] for r in client.get("/stats/top-products").json()]
+    assert names == ["Apfelschorle"]
+
+    # An explicit category pick still shows them (pie-slice drill-down).
+    filtered = client.get("/stats/top-products",
+                          params={"category": "Gutscheine & Rabatte"}).json()
+    assert [r["name"] for r in filtered] == ["LEERGUT EINWEG"]
+
+
 def test_top_products_group_by_receipt_name(api_engine, client):
     _persist_one(api_engine, "Nougat Creme", 2.99, 1, "t1")
     _persist_one(api_engine, "NOUGAT CREME", 1.79, 2, "t2")

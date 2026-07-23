@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
 from sqlmodel import Session, func, select
 
 from ..api_utils import clamp_limit, clamp_page
@@ -87,8 +88,12 @@ def list_products(search: str = "", category: str = "all", page: int = 1, limit:
     count_query = select(func.count(Product.id))
     if search.strip():
         like = f"%{search.strip()}%"
-        query = query.where(Product.display_name.ilike(like))
-        count_query = count_query.where(Product.display_name.ilike(like))
+        # Also match merged receipt spellings — a merged-away name must still
+        # find its surviving product.
+        aliased = select(ProductAlias.product_id).where(ProductAlias.name_key.ilike(like))
+        matches = or_(Product.display_name.ilike(like), Product.id.in_(aliased))
+        query = query.where(matches)
+        count_query = count_query.where(matches)
     if category != "all":
         query = query.where(Product.category == category)
         count_query = count_query.where(Product.category == category)

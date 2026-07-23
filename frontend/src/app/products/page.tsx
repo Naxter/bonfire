@@ -10,7 +10,7 @@ import { useEffect, useState } from "react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { Boxes, ChevronLeft, ChevronRight, Merge, Search, Split, TrendingUp } from "lucide-react"
 import {
-  errorDetail, getPriceAlerts, getProductDetail, getProducts, mergeProducts,
+  errorDetail, getCategories, getPriceAlerts, getProductDetail, getProducts, mergeProducts,
   splitProduct, updateProduct, type ProductDetail, type ProductRow, type UnitPrice,
 } from "@/lib/api"
 import { useApi, useDataVersion } from "@/lib/app-state"
@@ -76,8 +76,10 @@ function ProductDialog({ productId, onClose, onChanged }: {
   const { t, fmtMoney, fmtDate } = useI18n()
   const chart = useChartTheme()
   const [detail, setDetail] = useState<ProductDetail | null>(null)
-  const [draft, setDraft] = useState({ display_name: "", brand: "", size_value: "", size_unit: "" })
+  const [draft, setDraft] = useState({ display_name: "", brand: "", size_value: "", size_unit: "", category: "" })
   const [busy, setBusy] = useState(false)
+  const categories = useApi(() => getCategories(), [])
+  const categoryOptions = [...(categories.data ?? []), "Uncategorized"]
 
   useEffect(() => {
     // Reset synchronously so a previously opened product never flashes.
@@ -91,6 +93,7 @@ function ProductDialog({ productId, onClose, onChanged }: {
         brand: d.product.brand ?? "",
         size_value: d.product.size_value ? String(d.product.size_value) : "",
         size_unit: d.product.size_unit ?? "",
+        category: d.product.category,
       })
     }).catch(() => toast.error(t("common.errorLoad")))
   }, [productId, t])
@@ -104,6 +107,7 @@ function ProductDialog({ productId, onClose, onChanged }: {
         brand: draft.brand,
         size_value: draft.size_value ? Number(draft.size_value) : null,
         size_unit: draft.size_unit || null,
+        ...(draft.category ? { category: draft.category } : {}),
       })
       toast.success(t("products.updated"))
       onChanged()
@@ -172,6 +176,17 @@ function ProductDialog({ productId, onClose, onChanged }: {
                   </Select>
                 </label>
               </div>
+              <label className="block text-sm">
+                <span className="hud-label">{t("common.category")}</span>
+                <Select value={draft.category || undefined} onValueChange={(v) => setDraft({ ...draft, category: v })}>
+                  <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-[280px]">
+                    {categoryOptions.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
             </div>
 
             {/* Store comparison */}
@@ -394,7 +409,12 @@ export default function ProductsPage() {
                       <TableCell className="hidden text-xs text-muted-foreground sm:table-cell">
                         {p.size_value ? `${p.size_value} ${t(`unit.${p.size_unit}`)}` : "—"}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-sm">{p.times_bought}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {p.times_bought}
+                        {p.total_qty > p.times_bought && (
+                          <div className="hud-label">{t("products.totalQty", { n: p.total_qty })}</div>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {p.last_price !== null ? fmtMoney(p.last_price) : "—"}
                       </TableCell>
