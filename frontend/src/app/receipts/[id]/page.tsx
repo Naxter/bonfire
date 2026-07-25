@@ -321,56 +321,61 @@ export default function ReceiptDetailPage({ params }: { params: Promise<{ id: st
                     <TableHeader>
                       <TableRow className="border-border hover:bg-transparent">
                         <TableHead className="hud-label w-[52px]">{t("common.quantity")}</TableHead>
-                        <TableHead className="hud-label">{t("common.item")}</TableHead>
-                        <TableHead className="hud-label w-[190px]">{t("common.category")}</TableHead>
-                        <TableHead className="hud-label text-right">{t("common.price")}</TableHead>
+                        <TableHead className="hud-label w-full max-w-0 whitespace-normal">{t("common.item")}</TableHead>
+                        <TableHead className="hud-label hidden w-[190px] whitespace-normal md:table-cell">{t("common.category")}</TableHead>
+                        <TableHead className="hud-label whitespace-normal text-right">{t("common.price")}</TableHead>
                         <TableHead className="w-[84px]"><span className="sr-only">{t("common.actions")}</span></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {data.items.map((item) => (
-                        <TableRow key={item.id} className="border-border/60 hover:bg-secondary/40">
-                          <TableCell className="font-medium text-muted-foreground">{item.quantity}</TableCell>
-                          <TableCell className="font-medium">
-                            <span className={item.is_discounted ? "status-good" : ""} title={item.name}>{item.name}</span>
-                          </TableCell>
-                          <TableCell>
-                            <Select
-                              value={item.category || "Uncategorized"}
-                              onValueChange={(v) => onCategoryPicked(item, v)}
+                      {data.items.map((item) => {
+                        const categorySelect = (
+                          <Select
+                            value={item.category || "Uncategorized"}
+                            onValueChange={(v) => onCategoryPicked(item, v)}
+                          >
+                            <SelectTrigger
+                              aria-label={`${t("common.category")}: ${item.name}`}
+                              className="h-8 max-w-full border-transparent bg-transparent text-xs font-medium text-primary shadow-none hover:border-primary/30 hover:bg-secondary/60 focus:ring-0 focus:ring-offset-0"
                             >
-                              <SelectTrigger
-                                aria-label={`${t("common.category")}: ${item.name}`}
-                                className="h-8 border-transparent bg-transparent text-xs font-medium text-primary shadow-none hover:border-primary/30 hover:bg-secondary/60 focus:ring-0 focus:ring-offset-0"
-                              >
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {categoryOptions.map((cat) => (
-                                  <SelectItem key={cat} value={cat} className="text-xs">{cat}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell className={`text-right font-mono font-medium ${item.price_total < 0 ? "status-good" : ""}`}>
-                            {fmtMoney(item.price_total)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-end gap-1">
-                              <button type="button" onClick={() => openItemEdit(item)}
-                                      aria-label={`${t("common.edit")}: ${item.name}`}
-                                      className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary/60 hover:text-foreground">
-                                <Pencil className="h-3.5 w-3.5" aria-hidden />
-                              </button>
-                              <button type="button" onClick={() => removeItem(item)}
-                                      aria-label={`${t("common.delete")}: ${item.name}`}
-                                      className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
-                                <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                              </button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categoryOptions.map((cat) => (
+                                <SelectItem key={cat} value={cat} className="text-xs">{cat}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )
+                        return (
+                          <TableRow key={item.id} className="border-border/60 hover:bg-secondary/40">
+                            <TableCell className="font-medium text-muted-foreground">{item.quantity}</TableCell>
+                            <TableCell className="w-full max-w-0 font-medium">
+                              <span className={`block truncate ${item.is_discounted ? "status-good" : ""}`} title={item.name}>{item.name}</span>
+                              {/* on phones the category picker moves under the name so price and actions stay visible */}
+                              <div className="md:hidden">{categorySelect}</div>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">{categorySelect}</TableCell>
+                            <TableCell className={`text-right font-mono font-medium ${item.price_total < 0 ? "status-good" : ""}`}>
+                              {fmtMoney(item.price_total)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-end gap-1">
+                                <button type="button" onClick={() => openItemEdit(item)}
+                                        aria-label={`${t("common.edit")}: ${item.name}`}
+                                        className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary/60 hover:text-foreground">
+                                  <Pencil className="h-3.5 w-3.5" aria-hidden />
+                                </button>
+                                <button type="button" onClick={() => removeItem(item)}
+                                        aria-label={`${t("common.delete")}: ${item.name}`}
+                                        className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+                                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                                </button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
                     </TableBody>
                   </Table>
                 </div>

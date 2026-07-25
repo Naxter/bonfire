@@ -376,13 +376,13 @@ export default function ProductsPage() {
                 <TableHeader>
                   <TableRow className="border-border hover:bg-transparent">
                     <TableHead className="w-[36px]"><span className="sr-only">{t("products.merge")}</span></TableHead>
-                    <TableHead className="hud-label">{t("common.name")}</TableHead>
-                    <TableHead className="hud-label hidden md:table-cell">{t("common.category")}</TableHead>
-                    <TableHead className="hud-label hidden sm:table-cell">{t("products.size")}</TableHead>
-                    <TableHead className="hud-label text-right">{t("products.timesBought")}</TableHead>
-                    <TableHead className="hud-label text-right">{t("products.lastPrice")}</TableHead>
-                    <TableHead className="hud-label hidden text-right sm:table-cell">{t("products.unitPrice")}</TableHead>
-                    <TableHead className="hud-label hidden text-right lg:table-cell">{t("products.lastPurchased")}</TableHead>
+                    <TableHead className="hud-label w-full max-w-0 whitespace-normal">{t("common.name")}</TableHead>
+                    <TableHead className="hud-label hidden whitespace-normal md:table-cell">{t("common.category")}</TableHead>
+                    <TableHead className="hud-label hidden whitespace-normal sm:table-cell">{t("products.size")}</TableHead>
+                    <TableHead className="hud-label whitespace-normal text-right">{t("products.timesBought")}</TableHead>
+                    <TableHead className="hud-label whitespace-normal text-right">{t("products.lastPrice")}</TableHead>
+                    <TableHead className="hud-label hidden whitespace-normal text-right sm:table-cell">{t("products.unitPrice")}</TableHead>
+                    <TableHead className="hud-label hidden whitespace-normal text-right lg:table-cell">{t("products.lastPurchased")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -397,13 +397,13 @@ export default function ProductsPage() {
                           className="h-4 w-4 accent-[var(--primary)]"
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="w-full max-w-0">
                         <button type="button" onClick={() => setOpenProduct(p.id)}
-                                className="flex max-w-[320px] items-center gap-2 text-left text-sm font-medium hover:text-primary">
+                                className="flex w-full items-center gap-2 text-left text-sm font-medium hover:text-primary sm:max-w-[320px]">
                           <span className="truncate">{p.display_name}</span>
                           {p.stores.slice(0, 2).map((s) => <StoreBadge key={s.key} name={s.name} />)}
                         </button>
-                        {p.brand && <div className="hud-label">{p.brand}</div>}
+                        {p.brand && <div className="hud-label truncate">{p.brand}</div>}
                       </TableCell>
                       <TableCell className="hidden text-xs text-muted-foreground md:table-cell">{p.category}</TableCell>
                       <TableCell className="hidden text-xs text-muted-foreground sm:table-cell">
@@ -412,7 +412,7 @@ export default function ProductsPage() {
                       <TableCell className="text-right font-mono text-sm">
                         {p.times_bought}
                         {p.total_qty > p.times_bought && (
-                          <div className="hud-label">{t("products.totalQty", { n: p.total_qty })}</div>
+                          <div className="hud-label whitespace-normal">{t("products.totalQty", { n: p.total_qty })}</div>
                         )}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">

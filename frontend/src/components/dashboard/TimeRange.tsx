@@ -62,7 +62,7 @@ export function TimeRange({ value, onChange }: { value: Range; onChange: (r: Ran
       <Select value={monthValue || undefined} onValueChange={pickMonth}>
         <SelectTrigger
           aria-label={t("range.pickMonth")}
-          className={`h-7 w-[130px] border-none text-xs shadow-none focus:ring-0 focus:ring-offset-0 ${
+          className={`h-7 w-[148px] border-none text-xs shadow-none focus:ring-0 focus:ring-offset-0 ${
             monthValue ? "bg-primary/15 text-primary" : "bg-transparent text-muted-foreground hover:bg-secondary/70"
           }`}
         >
