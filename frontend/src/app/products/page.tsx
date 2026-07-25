@@ -291,7 +291,7 @@ function ProductDialog({ productId, onClose, onChanged }: {
 }
 
 export default function ProductsPage() {
-  const { t, fmtMoney, fmtDate } = useI18n()
+  const { t, fmtMoney, fmtDate, fmtNumber } = useI18n()
   const { version, refresh } = useDataVersion()
   const [search, setSearch] = useState("")
   const [debounced, setDebounced] = useState("")
@@ -412,7 +412,7 @@ export default function ProductsPage() {
                       <TableCell className="text-right font-mono text-sm">
                         {p.times_bought}
                         {p.total_qty > p.times_bought && (
-                          <div className="hud-label whitespace-normal">{t("products.totalQty", { n: p.total_qty })}</div>
+                          <div className="hud-label whitespace-normal">{t("products.totalQty", { n: fmtNumber(p.total_qty, 2) })}</div>
                         )}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">

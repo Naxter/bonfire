@@ -42,7 +42,7 @@ function PriceTooltip({ active, payload, fmtMoney }: PriceTooltipProps) {
 }
 
 export default function AnalyticsPage() {
-  const { t, fmtMoney } = useI18n()
+  const { t, fmtMoney, fmtNumber } = useI18n()
   const { store, range } = useFilters()
   const { version } = useDataVersion()
   const chart = useChartTheme()
@@ -284,20 +284,20 @@ export default function AnalyticsPage() {
                 <Table>
                   <TableHeader className="sticky top-0 bg-background/80 backdrop-blur z-10">
                     <TableRow className="hover:bg-transparent border-border">
-                      <TableHead className="hud-label w-full">{t("common.item")}</TableHead>
-                      <TableHead className="hud-label w-px text-right">{t("common.quantity")}</TableHead>
+                      <TableHead className="hud-label w-full max-w-0 whitespace-normal">{t("common.item")}</TableHead>
+                      <TableHead className="hud-label w-px whitespace-normal text-right">{t("common.quantity")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredProducts.map((item, index) => (
                       <TableRow key={index} className="border-border/60 hover:bg-secondary/40">
-                        <TableCell className="w-full whitespace-normal font-medium text-sm">
-                          <span className="flex flex-wrap items-center gap-2 break-words">
+                        <TableCell className="w-full max-w-0 whitespace-normal font-medium text-sm">
+                          <span className="flex flex-wrap items-center gap-2 wrap-anywhere">
                             {item.name}
                             <StoreBadge name={item.store} index={index} />
                           </span>
                         </TableCell>
-                        <TableCell className="w-px text-right font-mono font-semibold neon-cyan">{item.quantity}</TableCell>
+                        <TableCell className="w-px text-right font-mono font-semibold neon-cyan">{fmtNumber(item.quantity, 2)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

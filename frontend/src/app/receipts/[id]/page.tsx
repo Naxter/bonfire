@@ -57,7 +57,7 @@ export default function ReceiptDetailPage({ params }: { params: Promise<{ id: st
   const { id } = use(params)
   const receiptId = Number(id)
   const router = useRouter()
-  const { t, fmtMoney, fmtDate } = useI18n()
+  const { t, fmtMoney, fmtDate, fmtNumber } = useI18n()
   const { refresh } = useDataVersion()
   const { nudge } = useJobs()
 
@@ -349,7 +349,7 @@ export default function ReceiptDetailPage({ params }: { params: Promise<{ id: st
                         )
                         return (
                           <TableRow key={item.id} className="border-border/60 hover:bg-secondary/40">
-                            <TableCell className="font-medium text-muted-foreground">{item.quantity}</TableCell>
+                            <TableCell className="font-medium text-muted-foreground">{fmtNumber(item.quantity, 3)}</TableCell>
                             <TableCell className="w-full max-w-0 font-medium">
                               <span className={`block truncate ${item.is_discounted ? "status-good" : ""}`} title={item.name}>{item.name}</span>
                               {/* on phones the category picker moves under the name so price and actions stay visible */}

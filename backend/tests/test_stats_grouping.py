@@ -8,12 +8,12 @@ from app import ingest
 from app.stores.base import ParsedItem, ParsedReceipt
 
 
-def _persist_one(engine, name, price, day, tx):
+def _persist_one(engine, name, price, day, tx, quantity=1.0):
     parsed = ParsedReceipt(
         store_key="rewe", store_name="REWE",
         date=datetime(2026, 1, day, 12, 0), total=price,
         transaction_id=tx,
-        items=[ParsedItem(name=name, price_total=price)],
+        items=[ParsedItem(name=name, price_total=price, quantity=quantity)],
     )
     return ingest._persist(parsed, f"{tx}.pdf", content_hash=tx,
                            extraction_source="pdf_adapter")
@@ -49,6 +49,16 @@ def test_top_products_hide_money_flow_lines_by_default(api_engine, client):
     filtered = client.get("/stats/top-products",
                           params={"category": "Gutscheine & Rabatte"}).json()
     assert [r["name"] for r in filtered] == ["LEERGUT EINWEG"]
+
+
+def test_top_products_quantity_is_rounded(api_engine, client):
+    # Loose weights sum with binary rounding noise (0.1 + 0.2 = 0.300...04),
+    # which used to reach the leaderboard verbatim and blow up the column.
+    _persist_one(api_engine, "Rispentomaten", 0.29, 1, "q1", quantity=0.1)
+    _persist_one(api_engine, "Rispentomaten", 0.58, 2, "q2", quantity=0.2)
+
+    rows = client.get("/stats/top-products").json()
+    assert [r["quantity"] for r in rows] == [0.3]
 
 
 def test_top_products_group_by_receipt_name(api_engine, client):

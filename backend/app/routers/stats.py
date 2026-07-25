@@ -144,8 +144,11 @@ def get_top_products(mode: str = "all", year: str = None, month: str = None, sto
     query = query.group_by(Item.name).order_by(desc("quantity")).limit(limit)
     results = session.exec(query).all()
 
+    # Summing float quantities (weights like 0.436 kg) accumulates binary
+    # rounding noise — without this a leaderboard row reads 51.73999999999997.
     return [
-        {"name": name, "quantity": qty, "store": store_display_name(store_key)}
+        {"name": name, "quantity": round(float(qty or 0.0), 2),
+         "store": store_display_name(store_key)}
         for name, qty, store_key in results
     ]
 
