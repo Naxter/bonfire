@@ -143,6 +143,20 @@ def get_job(job_id: int, session: Session = Depends(get_session)):
     return job
 
 
+@router.delete("/jobs/{job_id}")
+def dismiss_job(job_id: int, session: Session = Depends(get_session)):
+    """Remove a finished job from the import history (the receipt, if any,
+    is untouched — this only clears the feed entry)."""
+    job = session.get(ImportJob, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    if job.status not in TERMINAL_STATUSES:
+        raise HTTPException(status_code=409, detail="Only finished jobs can be dismissed.")
+    session.delete(job)
+    session.commit()
+    return {"ok": True}
+
+
 @router.post("/jobs/{job_id}/retry")
 def retry_failed_job(job_id: int, session: Session = Depends(get_session)):
     """Re-run a failed import from wherever its file was parked."""

@@ -360,6 +360,10 @@ export const retryJob = async (jobId: number) => {
     return response.data as { job_id: number };
 };
 
+export const dismissJob = async (jobId: number) => {
+    await api.delete(`/jobs/${jobId}`);
+};
+
 export const uploadReceiptFile = async (file: File) => {
     const form = new FormData();
     form.append('file', file);

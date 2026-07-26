@@ -59,6 +59,19 @@ def test_retry_rejects_non_failed_jobs(api_engine, client):
     assert client.post(f"/jobs/{job_id}/retry").status_code == 409
 
 
+def test_finished_job_can_be_dismissed(api_engine, client):
+    job_id = jobs.create_job("upload", filename="x.pdf")
+    jobs.update_job(job_id, status="failed", error="boom")
+    assert client.delete(f"/jobs/{job_id}").status_code == 200
+    assert client.get(f"/jobs/{job_id}").status_code == 404
+
+
+def test_dismiss_rejects_unfinished_jobs(api_engine, client):
+    job_id = jobs.create_job("upload", filename="x.pdf")  # still queued
+    assert client.delete(f"/jobs/{job_id}").status_code == 409
+    assert client.delete("/jobs/999999").status_code == 404
+
+
 # ---- Malformed vision output ----------------------------------------------------
 def _write_image(tmp_path) -> str:
     path = tmp_path / "inbox" / "receipt.jpg"

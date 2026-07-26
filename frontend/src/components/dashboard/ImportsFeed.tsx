@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { CheckCircle2, CircleAlert, CopyCheck, Eye, Loader2, RotateCw } from "lucide-react"
-import { retryJob, type ImportJob } from "@/lib/api"
+import { CheckCircle2, CircleAlert, CopyCheck, Eye, Loader2, RotateCw, X } from "lucide-react"
+import { dismissJob, retryJob, type ImportJob } from "@/lib/api"
 import { useJobs } from "@/lib/app-state"
 import { useI18n } from "@/lib/i18n"
 import { toast } from "sonner"
@@ -26,6 +26,15 @@ export function ImportsFeed({ limit = 8, showEmpty = true }: { limit?: number; s
     try {
       await retryJob(job.id)
       toast.info(t("import.retried"))
+      nudge()
+    } catch {
+      toast.error(t("common.error"))
+    }
+  }
+
+  const dismiss = async (job: ImportJob) => {
+    try {
+      await dismissJob(job.id)
       nudge()
     } catch {
       toast.error(t("common.error"))
@@ -68,6 +77,17 @@ export function ImportsFeed({ limit = 8, showEmpty = true }: { limit?: number; s
                 className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-secondary/40 px-2 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground"
               >
                 <RotateCw className="h-3 w-3" aria-hidden /> {t("import.retry")}
+              </button>
+            )}
+            {job.status !== "queued" && job.status !== "running" && (
+              <button
+                type="button"
+                onClick={() => dismiss(job)}
+                title={t("import.dismiss")}
+                aria-label={t("import.dismiss")}
+                className="shrink-0 rounded-md p-1 text-muted-foreground/60 hover:bg-secondary/40 hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden />
               </button>
             )}
           </li>

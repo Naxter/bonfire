@@ -137,6 +137,7 @@ export const en: Record<string, string> = {
   "import.empty": "Nothing imported yet.",
   "import.retry": "Retry",
   "import.retried": "Retry queued.",
+  "import.dismiss": "Remove from history",
   "import.status.queued": "Queued",
   "import.status.running": "Processing…",
   "import.status.done": "Imported",
