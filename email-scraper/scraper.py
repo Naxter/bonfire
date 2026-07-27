@@ -7,6 +7,8 @@ timer or the Docker `scraper` service).
 """
 
 import email
+import glob
+import hashlib
 import imaplib
 import os
 import re
@@ -47,6 +49,44 @@ def receipt_date_tag(subject: str) -> str:
     return tag.replace(".", "_")
 
 
+def _stored_candidates(file_name: str) -> list[Path]:
+    """Every stored file that could already hold this attachment: the plain name
+    plus the ``-1``, ``-2`` … variants used for same-day receipts."""
+    stem, suffix = os.path.splitext(file_name)
+    pattern = f"{glob.escape(stem)}*{suffix}"
+    return [path
+            for folder in (INBOX_DIR, ARCHIVE_DIR) if folder.is_dir()
+            for path in folder.glob(pattern) if path.is_file()]
+
+
+def already_downloaded(file_name: str, digest: str) -> bool:
+    """True when this exact PDF already sits in the inbox or the archive.
+
+    Compares contents, not names. The filename only carries the subject's date
+    and REWE names every eBon attachment alike, so two shops on one day map to a
+    single filename — matching on the name alone silently dropped the second bon
+    and it never reached the watcher.
+    """
+    for path in _stored_candidates(file_name):
+        try:
+            if hashlib.sha256(path.read_bytes()).hexdigest() == digest:
+                return True
+        except OSError:
+            logger.warning(f"Could not read {path.name} to compare it; treating it as different.")
+    return False
+
+
+def free_inbox_path(file_name: str) -> Path:
+    """An inbox destination whose name is unused in both the inbox and the
+    archive, suffixing ``-1``, ``-2`` … the way the archiver does."""
+    stem, suffix = os.path.splitext(file_name)
+    for n in range(1000):
+        candidate = file_name if n == 0 else f"{stem}-{n}{suffix}"
+        if not (INBOX_DIR / candidate).exists() and not (ARCHIVE_DIR / candidate).exists():
+            return INBOX_DIR / candidate
+    raise RuntimeError(f"Could not find a free inbox name for {file_name}")
+
+
 def save_pdf_attachments(msg, date_tag: str) -> int:
     """Save the message's PDF attachments into the inbox; returns how many were new."""
     saved = 0
@@ -64,19 +104,29 @@ def save_pdf_attachments(msg, date_tag: str) -> int:
             continue
         file_name = f"{date_tag}_{safe}"
         base = INBOX_DIR.resolve()
-        file_path = base / file_name
-        if not file_path.resolve().is_relative_to(base):
+        if not (base / file_name).resolve().is_relative_to(base):
             logger.warning(f"Rejected suspicious attachment name: {raw_name!r}")
             continue
-        if file_path.is_file() or (ARCHIVE_DIR / file_name).is_file():
-            logger.debug(f"File {file_name} already downloaded.")
-            continue
+
         payload = part.get_payload(decode=True) or b""
+        if not payload:
+            logger.warning(f"Skipping empty attachment {file_name!r}.")
+            continue
         if len(payload) > MAX_ATTACHMENT_BYTES:
             logger.warning(f"Skipping oversized attachment {file_name!r}.")
             continue
+        if already_downloaded(file_name, hashlib.sha256(payload).hexdigest()):
+            logger.debug(f"File {file_name} already downloaded.")
+            continue
+
+        # Same name, different contents: a second shop on the same day. Keep
+        # both — the old name-only check dropped the newcomer for good.
+        file_path = free_inbox_path(file_name)
         file_path.write_bytes(payload)
-        logger.info(f"Saved {file_name}")
+        if file_path.name == file_name:
+            logger.info(f"Saved {file_path.name}")
+        else:
+            logger.info(f"Saved {file_path.name} (another receipt already uses {file_name})")
         saved += 1
     return saved
 
