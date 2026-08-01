@@ -3,8 +3,8 @@
 # the test suite; bump them in one PR and re-run `pytest`.
 
 # --- Core API + data layer ---
-fastapi==0.139.0
-uvicorn[standard]==0.51.0
+fastapi==0.141.1
+uvicorn[standard]==0.52.0
 sqlmodel==0.0.39            # brings in SQLAlchemy
 python-dotenv==1.2.2
 python-multipart==0.0.32     # required by FastAPI for the receipt photo upload
@@ -25,8 +25,8 @@ loguru==0.7.3                 # scraper.py
 # Only the active one is imported at runtime. It's auto-detected from whichever
 # API key is in .env (or force it with LLM_PROVIDER). Drop the ones you don't
 # use to slim the install — nothing else depends on them.
-openai==2.45.0                # cloud, recommended
-google-genai==2.11.0          # cloud (Gemini)
+openai==2.50.0                # cloud, recommended
+google-genai==2.15.0          # cloud (Gemini)
 ollama==0.6.2                 # local only; not needed on a cloud-API box
 
 # Dev tools are not runtime dependencies:  pip install pytest ruff
