@@ -93,6 +93,38 @@ def test_item_edit_scope_item_vs_all(api_engine, client):
         assert mapping.category == "Obst & Gemüse" and mapping.is_locked
 
 
+def test_category_change_does_not_verify_a_receipt_under_review(api_engine, client):
+    """Recategorising a line is metadata, not a review decision. A receipt still
+    under review must not silently flip to verified just because its category
+    changed — the totals already reconcile, so the old code did exactly that."""
+    receipt_id = _persist(api_engine, content_hash="h20",
+                          extraction_source="vision_llm").receipt_id  # needs_review, totals match
+    job_id = _needs_review_job(api_engine, receipt_id)
+    with Session(api_engine) as session:
+        item = session.exec(select(Item).where(Item.receipt_id == receipt_id,
+                                               Item.name == "Banane")).one()
+
+    r = client.patch(f"/receipts/{receipt_id}/items/{item.id}",
+                     json={"category": "Obst & Gemüse", "category_scope": "item"})
+    assert r.status_code == 200
+    assert client.get(f"/receipts/{receipt_id}").json()["receipt"]["review_status"] == "needs_review"
+    with Session(api_engine) as session:
+        assert session.get(ImportJob, job_id).status == "needs_review"
+
+
+def test_item_number_correction_still_verifies(api_engine, client):
+    """The intended path is untouched: fixing the actual numbers on a line so
+    the items reconcile still passes the receipt through review."""
+    receipt_id = _persist(api_engine, total=10.0, content_hash="h21").receipt_id  # mismatch
+    with Session(api_engine) as session:
+        banane = session.exec(select(Item).where(Item.receipt_id == receipt_id,
+                                                 Item.name == "Banane")).one()
+    # 8.01 + 1.99 (Milch) == 10.00, so the items now match the printed total.
+    r = client.patch(f"/receipts/{receipt_id}/items/{banane.id}", json={"price_total": 8.01})
+    assert r.status_code == 200
+    assert client.get(f"/receipts/{receipt_id}").json()["receipt"]["review_status"] == "verified"
+
+
 def test_item_add_and_delete_refresh_totals_check(api_engine, client):
     receipt_id = _persist(api_engine, content_hash="h9").receipt_id
     r = client.post(f"/receipts/{receipt_id}/items",

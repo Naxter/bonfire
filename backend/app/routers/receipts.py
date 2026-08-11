@@ -473,7 +473,13 @@ def update_item(receipt_id: int, item_id: int, data: ItemUpdate,
         else:
             item.category = data.category
 
-    _refresh_trust(session, receipt, touched_by_user=True)
+    # A category is a label on the product, not a correction of what the receipt
+    # says: recategorising a line must not silently pass the whole receipt
+    # through review. Only edits to the numbers or the name count as a human
+    # check; a category-only change leaves the review status untouched.
+    corrected = any(v is not None for v in
+                    (data.name, data.quantity, data.price_total, data.price_single))
+    _refresh_trust(session, receipt, touched_by_user=corrected)
     session.commit()
     session.refresh(item)
     return {"item": item, "updated_items": updated_items}
