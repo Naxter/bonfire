@@ -3,15 +3,15 @@
 # the test suite; bump them in one PR and re-run `pytest`.
 
 # --- Core API + data layer ---
-fastapi==0.139.0
-uvicorn[standard]==0.51.0
-sqlmodel==0.0.39            # brings in SQLAlchemy
-python-dotenv==1.2.2
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+sqlmodel==0.0.42            # brings in SQLAlchemy
+python-dotenv==1.2.3
 python-multipart==0.0.32     # required by FastAPI for the receipt photo upload
 slowapi==0.1.10              # rate limiting on LLM-cost endpoints
 
 # --- Receipt parsing ---
-PyMuPDF==1.28.0               # imported as `fitz`; PDF text extraction
+PyMuPDF==1.28.2               # imported as `fitz`; PDF text extraction
 rewe-ebon-parser==0.0.8       # REWE eBon PDFs (upstream is still 0.x — no 1.0 exists)
 
 # --- Ingest + integrations ---
@@ -25,8 +25,8 @@ loguru==0.7.3                 # scraper.py
 # Only the active one is imported at runtime. It's auto-detected from whichever
 # API key is in .env (or force it with LLM_PROVIDER). Drop the ones you don't
 # use to slim the install — nothing else depends on them.
-openai==2.45.0                # cloud, recommended
-google-genai==2.11.0          # cloud (Gemini)
+openai==3.6.0                # cloud, recommended
+google-genai==2.20.0          # cloud (Gemini)
 ollama==0.6.2                 # local only; not needed on a cloud-API box
 
 # Dev tools are not runtime dependencies:  pip install pytest ruff
