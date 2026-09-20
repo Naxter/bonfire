@@ -21,6 +21,7 @@ import { useDataVersion, useFilters, useJobs } from "@/lib/app-state"
 import { useI18n } from "@/lib/i18n"
 import { registerStores } from "@/lib/theme"
 import { FetchMailsButton } from "@/components/dashboard/FetchMailsButton"
+import { FetchKauflandButton } from "@/components/dashboard/FetchKauflandButton"
 import { UploadReceiptButton } from "@/components/dashboard/UploadReceiptButton"
 import { TimeRange } from "@/components/dashboard/TimeRange"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -93,7 +94,7 @@ function HealthDot() {
         .then(setHealth)
         .catch(() => setHealth({
           status: "degraded", db: false, llm_provider: "unreachable",
-          llm_configured: false, mail_configured: false, auth_enabled: false,
+          llm_configured: false, mail_configured: false, kaufland_configured: false, auth_enabled: false,
         }))
     load()
     const timer = setInterval(load, 30000)
@@ -224,6 +225,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <HealthDot />
               <JobsIndicator />
               <FetchMailsButton />
+              <FetchKauflandButton />
               <UploadReceiptButton />
             </div>
           </div>

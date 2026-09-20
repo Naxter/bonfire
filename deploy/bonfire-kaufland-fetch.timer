@@ -1,0 +1,12 @@
+[Unit]
+Description=Bonfire - download Kaufland receipts weekly
+
+[Timer]
+# Kaufland receipt history is checked once a week; the dashboard button can
+# trigger an on-demand download between scheduled runs.
+OnCalendar=Sun *-*-* 05:30:00
+Persistent=true
+RandomizedDelaySec=30m
+
+[Install]
+WantedBy=timers.target

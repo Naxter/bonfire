@@ -32,6 +32,7 @@ _STORE_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
 
 _MEDIA_TYPES = {
     ".pdf": "application/pdf",
+    ".json": "application/json",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".png": "image/png",
@@ -279,7 +280,7 @@ def get_receipt_details(receipt_id: int, session: Session = Depends(get_session)
 @router.get("/receipts/{receipt_id}/source")
 def get_receipt_source(receipt_id: int, download: bool = False,
                        session: Session = Depends(get_session)):
-    """Serve the archived original (PDF or photo) for side-by-side review."""
+    """Serve the archived original (PDF, photo, or provider JSON) for review."""
     receipt = _get_receipt_or_404(session, receipt_id)
     path = _resolve_source_file(receipt)
     if path is None:

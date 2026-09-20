@@ -1,6 +1,6 @@
 """Tracked background import jobs.
 
-Uploads, mail fetches, watcher pickups and reprocess runs all record an
+Uploads, mail fetches, Kaufland syncs, watcher pickups and reprocess runs all record an
 ImportJob row and update it as they go. The frontend polls ``/jobs`` instead
 of reloading the page, and failed imports stay visible (with a retry) instead
 of vanishing into the server log.
@@ -46,6 +46,7 @@ _PRUNE_KEEP = 500
 
 # One mail fetch at a time (the IMAP mailbox is a shared resource).
 _mail_fetch_lock = threading.Lock()
+_kaufland_fetch_lock = threading.Lock()
 
 _SCRAPER_PATH = Path(__file__).resolve().parents[2] / "email-scraper" / "scraper.py"
 
@@ -291,4 +292,47 @@ def start_mail_fetch() -> int | None:
         return job_id
     except Exception:
         _mail_fetch_lock.release()
+        raise
+
+
+# --------------------------------------------------------------------------- #
+# Kaufland API fetch
+# --------------------------------------------------------------------------- #
+def _run_kaufland_fetch() -> dict:
+    """Download and import Kaufland transactions in the current process."""
+    from .kaufland import download_kaufland_receipts
+
+    return download_kaufland_receipts()
+
+
+def _kaufland_fetch_worker(job_id: int) -> None:
+    try:
+        update_job(job_id, status="running")
+        result = _run_kaufland_fetch()
+        new = int(result.get("new_receipts", 0))
+        received = int(result.get("transactions_received", 0))
+        if new:
+            message = f"Kaufland: {new} new receipt{'s' if new != 1 else ''} imported."
+        else:
+            message = f"Kaufland checked ({received} receipt{'s' if received != 1 else ''}); nothing new."
+        update_job(job_id, status="done", message=message, detail=result, store_key="kaufland")
+    except Exception as exc:
+        # Expected Kaufland errors contain actionable setup/API information;
+        # unexpected exceptions are logged but not exposed as tracebacks.
+        logger.exception("Kaufland fetch job %s failed", job_id)
+        update_job(job_id, status="failed", error=str(exc)[:500], store_key="kaufland")
+    finally:
+        _kaufland_fetch_lock.release()
+
+
+def start_kaufland_fetch() -> int | None:
+    """Kick off a background Kaufland receipt download, or return None if busy."""
+    if not _kaufland_fetch_lock.acquire(blocking=False):
+        return None
+    try:
+        job_id = create_job("kaufland_fetch", filename=None, store_key="kaufland")
+        _spawn(_kaufland_fetch_worker, job_id)
+        return job_id
+    except Exception:
+        _kaufland_fetch_lock.release()
         raise

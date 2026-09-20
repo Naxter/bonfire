@@ -20,9 +20,12 @@ class Receipt(SQLModel, table=True):
     loyalty_program: str | None = None
     loyalty_details: dict[str, Any] = Field(default={}, sa_column=Column(JSON))
     raw_data: dict[str, Any] = Field(default={}, sa_column=Column(JSON))
+    # Historical field name: it stores the archived source filename. Kaufland
+    # API receipts use a JSON source here; existing database/API consumers keep
+    # the field stable while the public schema exposes the source kind.
     pdf_filename: str
-    # sha256 of the source file — the robust dedup key (filenames can change,
-    # REWE eBons carry no transaction id). Unique index in _run_migrations.
+    # sha256 of the source file/payload — the robust dedup key (filenames can
+    # change, REWE eBons carry no transaction id). Unique index in migrations.
     content_hash: str | None = None
     # --- Data-trust layer -------------------------------------------------- #
     # ok            parsed cleanly by a deterministic store adapter
@@ -91,7 +94,7 @@ class ImportJob(SQLModel, table=True):
     visible lifecycle (queued → running → done/failed) and failures stay
     inspectable afterwards — the import/error history."""
     id: int | None = Field(default=None, primary_key=True)
-    kind: str = Field(index=True)      # upload | mail_fetch | watcher | reprocess
+    kind: str = Field(index=True)      # upload | mail_fetch | kaufland_fetch | watcher | reprocess
     status: str = Field(default="queued", index=True)
     # queued | running | done | duplicate | needs_review | no_data | failed
     filename: str | None = None

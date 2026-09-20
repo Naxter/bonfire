@@ -5,8 +5,9 @@
 > systemd setup (lighter on the SD card, wall-clock timers).
 
 This sets the whole thing up to run by itself: the API + dashboard stay up, new
-REWE eBons are pulled from your GMX inbox on a schedule, and any PDF you drop
-into the inbox folder (e.g. a DM eBon) is ingested automatically.
+REWE eBons and (optionally) Kaufland digital receipts are pulled on a schedule,
+and any PDF you drop into the inbox folder (e.g. a DM eBon) is ingested
+automatically.
 
 The LLM runs **in the cloud** (OpenAI or Gemini), so no Ollama / GPU is needed
 on the Pi. Switching provider is a one-line `.env` change.
@@ -70,6 +71,16 @@ config. (Set `LLM_PROVIDER=ollama` only if you want the local model instead.)
 Also fill in `GMX_USER` / `GMX_PASSWORD` / `REWE_SENDER` for the email scraper,
 and set `FRONTEND_ORIGINS=http://<pi-ip>:3000` so the browser can reach the API.
 
+For Kaufland, complete the one-time browser login before enabling its timer:
+
+```bash
+cd /home/pi/bonfire/backend
+../venv/bin/python kaufland_sync.py login
+```
+
+This stores the refresh token in `backend/data/kaufland/`. Keep that directory
+private and do not put its contents in Git.
+
 > DM needs no configuration — DM receipts are handled by manually dropping
 > their PDFs into the inbox (see step 6).
 
@@ -100,6 +111,9 @@ sudo systemctl enable --now bonfire-frontend.service
 # Scheduled REWE fetch (enable the TIMER, not the service):
 sudo systemctl enable --now bonfire-rewe-scrape.timer
 
+# Optional: enable after completing the Kaufland login above.
+sudo systemctl enable --now bonfire-kaufland-fetch.timer
+
 # Nightly SQLite backup (enable the TIMER) — important on an SD card:
 sudo systemctl enable --now bonfire-backup.timer
 
@@ -113,6 +127,7 @@ Check status / logs:
 systemctl status bonfire-watcher.service
 journalctl -u bonfire-watcher.service -f
 systemctl list-timers bonfire-rewe-scrape.timer
+systemctl list-timers bonfire-kaufland-fetch.timer
 ```
 
 ## 6. Day-to-day
@@ -125,6 +140,10 @@ systemctl list-timers bonfire-rewe-scrape.timer
   folder, etc.). The watcher picks it up within a couple of seconds, parses it,
   and moves it to `data/archive/dm/`. (Dropping into the `inbox/` root still
   works too — the store is then auto-detected from the PDF.)
+- **Kaufland:** complete the login once, then use the dashboard's **Fetch
+  Kaufland** button or enable `bonfire-kaufland-fetch.timer`. Each transaction
+  is deduplicated and its complete provider JSON is archived under
+  `backend/data/archive/kaufland/`.
 - **Dashboard:** `http://<pi-ip>:3000` (LAN only — see the README's
   "Security & scope" note).
 

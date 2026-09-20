@@ -134,6 +134,40 @@ Open http://localhost:3000 and you get the dashboard above. Delete
    the DM app/website (or photograph the paper receipt) and drop it into
    `backend/data/inbox/dm/`.
 
+## Downloading Kaufland receipts
+
+Kaufland digital receipts can be downloaded directly from the authenticated
+receipt API. The integration uses a manual OAuth/PKCE browser login once, then
+refreshes the saved token for later downloads. It does not ask for or store a
+Kaufland password.
+
+From the `backend/` directory, configure the optional values in `.env` and run:
+
+```sh
+python kaufland_sync.py login
+python kaufland_sync.py sync
+```
+
+The login opens the Kaufland authorization page. After signing in, paste the
+complete redirected callback URL into the terminal. If userinfo cannot provide
+the provider's internal user ID, set `KAUFLAND_USER_ID` to that ID (not an
+email address) and repeat the login. The saved token and account metadata live
+under `backend/data/kaufland/`, which is gitignored.
+
+The dashboard header also provides **Fetch Kaufland** once the login is
+configured. It starts a tracked background job at `POST /scrape/kaufland`.
+Downloads are deduplicated by the provider transaction ID. Each receipt keeps
+the normalized fields used by Bonfire, the complete Kaufland transaction in
+`raw_data`, and an archived JSON source under `backend/data/archive/kaufland/`.
+The raw API pages and a run report are kept under `backend/data/kaufland/raw/`
+and `backend/data/kaufland/runs/` for troubleshooting.
+
+Kaufland's API amounts are integer minor units (cents) and the downloader
+converts them to Bonfire's euro values. If line items do not reconcile with the
+provider total, the receipt enters the normal review workflow. The provider
+client is isolated from the store-agnostic ingest contract so other supermarket
+APIs can retain their own raw payload shape in the same way.
+
 ## Adding a new store
 
 The pipeline is store-agnostic. To support a new chain (e.g. Lidl):

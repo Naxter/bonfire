@@ -33,6 +33,8 @@ class ParsedReceipt:
     date: datetime
     total: float
     items: list[ParsedItem] = field(default_factory=list)
+    currency: str = "EUR"
+    payment_method: str | None = None
     store_address: str | None = None
     store_id: str | None = None
     transaction_id: str | None = None

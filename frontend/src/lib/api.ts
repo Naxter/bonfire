@@ -115,7 +115,7 @@ export interface Receipt {
   extraction_source: string;
   parse_warnings: string[];
   has_source: boolean;
-  source_kind: "pdf" | "image" | null;
+  source_kind: "pdf" | "image" | "json" | null;
 }
 
 export interface ReceiptListRow extends Receipt {
@@ -321,11 +321,13 @@ export interface Health {
     llm_provider: string;
     llm_configured: boolean;
     mail_configured: boolean;
+    kaufland_configured: boolean;
     auth_enabled: boolean;
     watcher?: { alive: boolean; last_seen: string | null };
     backup?: { last_at: string | null };
     imports?: { last_success_at: string | null; failed_24h: number };
     mail?: { configured: boolean; last_fetch_at: string | null; last_fetch_ok: boolean | null };
+    kaufland?: { configured: boolean; last_fetch_at: string | null; last_fetch_ok: boolean | null };
     receipts?: { count: number; needs_review: number };
     llm_probe?: { reachable: boolean; latency_ms?: number; error?: string; cached: boolean };
 }
@@ -338,7 +340,7 @@ export const getHealth = async (probeLlm = false) => {
 // --- Import jobs ---------------------------------------------------------------
 export interface ImportJob {
     id: number;
-    kind: "upload" | "mail_fetch" | "watcher" | "reprocess";
+    kind: "upload" | "mail_fetch" | "kaufland_fetch" | "watcher" | "reprocess";
     status: "queued" | "running" | "done" | "duplicate" | "needs_review" | "failed";
     filename: string | null;
     store_key: string | null;
@@ -374,6 +376,12 @@ export const uploadReceiptFile = async (file: File) => {
 // On-demand run of the REWE mail scraper — returns a tracked job.
 export const fetchReweMails = async () => {
     const response = await api.post('/scrape/rewe');
+    return response.data as { job_id: number };
+};
+
+// On-demand Kaufland receipt download using the saved OAuth refresh token.
+export const fetchKauflandReceipts = async () => {
+    const response = await api.post('/scrape/kaufland');
     return response.data as { job_id: number };
 };
 
