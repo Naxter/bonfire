@@ -19,7 +19,6 @@ import hmac
 import json
 import logging
 import os
-import re
 import secrets
 import stat
 import tempfile
@@ -675,36 +674,15 @@ def transaction_to_parsed_receipt(transaction: Mapping[str, Any]) -> ParsedRecei
     )
 
 
-def _safe_filename(identifier: str) -> str:
-    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", identifier).strip("._")
-    return (safe or "transaction")[:160]
-
-
 def archive_remote_receipt(parsed: ParsedReceipt) -> Any:
-    """Archive the complete transaction and send it through normal ingest."""
+    """Hand the transaction to the store-agnostic API-ingest entry point.
+
+    Archiving, hashing, and dedup are the same for every API-based store, so
+    they live in ``app/ingest.py``; this module only owns the Kaufland protocol.
+    """
     from . import ingest
 
-    payload = (
-        json.dumps(parsed.raw_data, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    ).encode("utf-8")
-    digest = hashlib.sha256(payload).hexdigest()
-    archive_dir = ingest.ARCHIVE_DIR / "kaufland"
-    archive_dir.mkdir(parents=True, exist_ok=True)
-    base = _safe_filename(parsed.transaction_id or digest)
-    destination = archive_dir / f"{base}.json"
-    if destination.exists() and destination.read_bytes() != payload:
-        destination = archive_dir / f"{base}-{digest[:10]}.json"
-    if not destination.exists():
-        _atomic_write(destination, payload)
-    report = ingest._persist(
-        parsed,
-        destination.name,
-        content_hash=digest,
-        source_path=ingest._relative_to_data(destination),
-        extraction_source="kaufland_api",
-    )
-    report.file_path = ingest._relative_to_data(destination)
-    return report
+    return ingest.ingest_api_receipt(parsed, extraction_source="kaufland_api")
 
 
 def _run_id() -> str:

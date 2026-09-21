@@ -16,8 +16,8 @@ import {
   BarChart3, Boxes, ChevronLeft, ChevronRight, Home, ListChecks, Loader2,
   MoreHorizontal, Receipt, Settings, Wallet, X,
 } from "lucide-react"
-import { getHealth, getNeedsReviewCount, getStores, type Health } from "@/lib/api"
-import { useDataVersion, useFilters, useJobs } from "@/lib/app-state"
+import { getNeedsReviewCount, getStores } from "@/lib/api"
+import { useDataVersion, useFilters, useHealth, useJobs } from "@/lib/app-state"
 import { useI18n } from "@/lib/i18n"
 import { registerStores } from "@/lib/theme"
 import { FetchMailsButton } from "@/components/dashboard/FetchMailsButton"
@@ -86,20 +86,7 @@ function NavLink({ item, collapsed, badge, onNavigate }: {
 
 function HealthDot() {
   const { t } = useI18n()
-  const [health, setHealth] = useState<Health | null>(null)
-
-  useEffect(() => {
-    const load = () =>
-      getHealth()
-        .then(setHealth)
-        .catch(() => setHealth({
-          status: "degraded", db: false, llm_provider: "unreachable",
-          llm_configured: false, mail_configured: false, kaufland_configured: false, auth_enabled: false,
-        }))
-    load()
-    const timer = setInterval(load, 30000)
-    return () => clearInterval(timer)
-  }, [])
+  const health = useHealth()
 
   const ok = health?.status === "ok"
   const down = health ? !health.db : false

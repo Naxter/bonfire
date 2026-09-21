@@ -4,7 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { AppShell } from "@/components/shell/AppShell";
-import { DataProvider, FiltersProvider, JobsProvider } from "@/lib/app-state";
+import { DataProvider, FiltersProvider, HealthProvider, JobsProvider } from "@/lib/app-state";
 import { I18nProvider } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -40,10 +40,12 @@ export default function RootLayout({
           <I18nProvider>
             <DataProvider>
               <JobsProvider>
-                <FiltersProvider>
-                  <AppShell>{children}</AppShell>
-                  <Toaster position="bottom-right" richColors />
-                </FiltersProvider>
+                <HealthProvider>
+                  <FiltersProvider>
+                    <AppShell>{children}</AppShell>
+                    <Toaster position="bottom-right" richColors />
+                  </FiltersProvider>
+                </HealthProvider>
               </JobsProvider>
             </DataProvider>
           </I18nProvider>

@@ -9,11 +9,13 @@
  *                      refetches. Replaces the old full-page reloads.
  *  - JobsProvider      polls /jobs while imports are running, toasts when a
  *                      tracked job lands, and bumps the data version.
+ *  - HealthProvider    one shared /health poll — the status dot and the
+ *                      configuration-gated header actions read from it.
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { getJobs, type ImportJob } from "@/lib/api"
+import { getHealth, getJobs, type Health, type ImportJob } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 
 // ---------------------------------------------------------------------------
@@ -239,6 +241,43 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
 export function useJobs(): JobsState {
   const ctx = useContext(JobsContext)
   if (!ctx) throw new Error("useJobs must be used inside <JobsProvider>")
+  return ctx
+}
+
+// ---------------------------------------------------------------------------
+// Backend health
+// ---------------------------------------------------------------------------
+/** Null until the first probe lands, so callers can tell "unknown" from "off". */
+const HealthContext = createContext<Health | null | undefined>(undefined)
+
+const HEALTH_POLL_MS = 30000
+
+export function HealthProvider({ children }: { children: React.ReactNode }) {
+  const [health, setHealth] = useState<Health | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    const load = () =>
+      getHealth()
+        .then((h) => { if (alive) setHealth(h) })
+        .catch(() => {
+          if (alive) setHealth({
+            status: "degraded", db: false, llm_provider: "unreachable",
+            llm_configured: false, mail_configured: false, kaufland_configured: false,
+            auth_enabled: false,
+          })
+        })
+    load()
+    const timer = setInterval(load, HEALTH_POLL_MS)
+    return () => { alive = false; clearInterval(timer) }
+  }, [])
+
+  return <HealthContext.Provider value={health}>{children}</HealthContext.Provider>
+}
+
+export function useHealth(): Health | null {
+  const ctx = useContext(HealthContext)
+  if (ctx === undefined) throw new Error("useHealth must be used inside <HealthProvider>")
   return ctx
 }
 
