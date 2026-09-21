@@ -11,9 +11,12 @@ working).
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
+import re
 import shutil
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -394,3 +397,62 @@ def move_to_failed(file_path: str) -> Path | None:
     FAILED_DIR.mkdir(parents=True, exist_ok=True)
     dest = _collision_free(FAILED_DIR / src.name)
     return _move_resilient(src, dest)
+
+
+# --------------------------------------------------------------------------- #
+# API-sourced receipts
+# --------------------------------------------------------------------------- #
+def _atomic_write(path: Path, content: bytes) -> None:
+    """Write via temp file + rename, so a reader never sees a partial archive."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_name, path)
+    except Exception:
+        Path(temp_name).unlink(missing_ok=True)
+        raise
+
+
+def _safe_filename(identifier: str) -> str:
+    """A provider id reduced to a filename that is safe on every filesystem."""
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", identifier).strip("._")
+    return (safe or "transaction")[:160]
+
+
+def ingest_api_receipt(parsed: ParsedReceipt, *, extraction_source: str) -> IngestReport:
+    """Archive a receipt downloaded from a store API, then persist it.
+
+    Store API clients (``app/kaufland.py`` and any later one) hand over a
+    normalized :class:`ParsedReceipt` whose ``raw_data`` holds the complete
+    provider payload. Everything from here on is store-agnostic: the payload is
+    archived as JSON under ``data/archive/<store>/``, its sha256 becomes the
+    dedup key, and the row goes through the same ``_persist`` path as a parsed
+    PDF — so API receipts get the same dedup, review, and source-download
+    behaviour as every other receipt.
+    """
+    payload = (
+        json.dumps(parsed.raw_data, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    digest = hashlib.sha256(payload).hexdigest()
+    archive_dir = ARCHIVE_DIR / (parsed.store_key or "api")
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    base = _safe_filename(parsed.transaction_id or digest)
+    destination = archive_dir / f"{base}.json"
+    # Same provider id, different payload: keep both rather than overwrite.
+    if destination.exists() and destination.read_bytes() != payload:
+        destination = archive_dir / f"{base}-{digest[:10]}.json"
+    if not destination.exists():
+        _atomic_write(destination, payload)
+    report = _persist(
+        parsed,
+        destination.name,
+        content_hash=digest,
+        source_path=_relative_to_data(destination),
+        extraction_source=extraction_source,
+    )
+    report.file_path = _relative_to_data(destination)
+    return report

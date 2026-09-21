@@ -3,15 +3,18 @@
 import { useState } from "react"
 import { CloudDownload } from "lucide-react"
 import { errorDetail, fetchKauflandReceipts } from "@/lib/api"
-import { useJobs } from "@/lib/app-state"
+import { useHealth, useJobs } from "@/lib/app-state"
 import { useI18n } from "@/lib/i18n"
 import { toast } from "sonner"
 
-/** Start a tracked Kaufland API download using the login configured on the host. */
+/** Start a tracked Kaufland API download using the login configured on the host.
+ *  Hidden until the host reports a completed login — without one the endpoint
+ *  can only answer 503, so an always-visible button would just be a trap. */
 export function FetchKauflandButton() {
   const { t } = useI18n()
   const [busy, setBusy] = useState(false)
   const { nudge } = useJobs()
+  const health = useHealth()
 
   const onClick = async () => {
     setBusy(true)
@@ -24,6 +27,8 @@ export function FetchKauflandButton() {
       setBusy(false)
     }
   }
+
+  if (!health?.kaufland_configured) return null
 
   return (
     <button
