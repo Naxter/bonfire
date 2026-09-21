@@ -52,7 +52,9 @@ export function ImportsFeed({ limit = 8, showEmpty = true }: { limit?: number; s
       {shown.map((job) => {
         const label = job.message
           || job.filename
-          || (job.kind === "mail_fetch" ? t("import.kind.mail_fetch") : `#${job.id}`)
+          || (job.kind === "mail_fetch"
+            ? t("import.kind.mail_fetch")
+            : job.kind === "kaufland_fetch" ? t("import.kind.kaufland_fetch") : `#${job.id}`)
         return (
           <li key={job.id} className="flex items-center gap-3 px-4 py-2.5">
             <StatusIcon status={job.status} />

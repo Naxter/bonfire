@@ -26,7 +26,7 @@ class ReceiptPublic(SQLModel):
     # Derived, never the raw path: whether /receipts/{id}/source has something
     # to serve, and how the UI should embed it.
     has_source: bool = False
-    source_kind: str | None = None  # "pdf" | "image" | None
+    source_kind: str | None = None  # "pdf" | "image" | "json" | None
 
     @classmethod
     def from_receipt(cls, receipt: Receipt) -> ReceiptPublic:
@@ -34,7 +34,12 @@ class ReceiptPublic(SQLModel):
         source = receipt.source_path or ""
         if source:
             data.has_source = True
-            data.source_kind = "pdf" if source.lower().endswith(".pdf") else "image"
+            if source.lower().endswith(".pdf"):
+                data.source_kind = "pdf"
+            elif source.lower().endswith(".json"):
+                data.source_kind = "json"
+            else:
+                data.source_kind = "image"
         return data
 
 

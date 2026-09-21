@@ -18,6 +18,7 @@ from sqlmodel import Session, SQLModel, func, select
 
 from ..categories import VALID_CATEGORIES
 from ..database import DATA_DIR, engine, get_session
+from ..kaufland import is_configured
 from ..llm import complete, resolve_provider_name
 from ..models import ImportJob, MealProfile, Receipt
 from ..settings import get_settings, update_settings
@@ -112,6 +113,7 @@ def health(probe: str = ""):
         "llm_configured": llm_ok,
         "mail_configured": bool(os.getenv("GMX_USER") and os.getenv("GMX_PASSWORD")
                                 and os.getenv("REWE_SENDER")),
+        "kaufland_configured": is_configured(),
         "auth_enabled": bool((os.getenv("BONFIRE_API_TOKEN") or "").strip()),
     }
 
@@ -145,6 +147,10 @@ def health(probe: str = ""):
                     select(ImportJob).where(ImportJob.kind == "mail_fetch")
                     .order_by(desc(ImportJob.id)).limit(1)
                 ).first()
+                last_kaufland = session.exec(
+                    select(ImportJob).where(ImportJob.kind == "kaufland_fetch")
+                    .order_by(desc(ImportJob.id)).limit(1)
+                ).first()
                 failed_24h = session.exec(
                     select(func.count(ImportJob.id)).where(
                         ImportJob.status == "failed",
@@ -165,6 +171,12 @@ def health(probe: str = ""):
                 "last_fetch_at": (last_mail.finished_at.isoformat()
                                   if last_mail and last_mail.finished_at else None),
                 "last_fetch_ok": last_mail.status == "done" if last_mail else None,
+            }
+            data["kaufland"] = {
+                "configured": data["kaufland_configured"],
+                "last_fetch_at": (last_kaufland.finished_at.isoformat()
+                                  if last_kaufland and last_kaufland.finished_at else None),
+                "last_fetch_ok": last_kaufland.status == "done" if last_kaufland else None,
             }
             data["receipts"] = {"count": int(receipt_count), "needs_review": int(needs_review)}
         except Exception:

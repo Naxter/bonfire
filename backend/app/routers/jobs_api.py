@@ -22,6 +22,7 @@ from ..jobs import (
     process_tracked_file,
     retry_job,
     start_file_job,
+    start_kaufland_fetch,
     start_mail_fetch,
 )
 from ..models import ImportJob
@@ -112,6 +113,30 @@ async def scrape_rewe(request: Request):
     job_id = start_mail_fetch()
     if job_id is None:
         raise HTTPException(status_code=409, detail="A mail fetch is already running.")
+    return {"job_id": job_id}
+
+
+@router.post("/scrape/kaufland")
+@limiter.limit("4/minute")
+async def scrape_kaufland(request: Request):
+    """Download Kaufland digital receipts through the saved API login."""
+    from ..kaufland import KauflandConfig, is_configured
+
+    try:
+        configured = is_configured(KauflandConfig.from_environment())
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+    if not configured:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Kaufland is not configured; run 'python kaufland_sync.py login' "
+                "and set KAUFLAND_USER_ID if needed."
+            ),
+        )
+    job_id = start_kaufland_fetch()
+    if job_id is None:
+        raise HTTPException(status_code=409, detail="A Kaufland receipt download is already running.")
     return {"job_id": job_id}
 
 

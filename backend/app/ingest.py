@@ -221,6 +221,8 @@ def _persist(parsed: ParsedReceipt, filename: str, content_hash: str | None = No
             store_id=parsed.store_id,
             date=parsed.date,
             total_amount=parsed.total,
+            currency=parsed.currency,
+            payment_method=parsed.payment_method,
             transaction_id=parsed.transaction_id,
             loyalty_program=parsed.loyalty_program,
             loyalty_details=parsed.loyalty_details,
@@ -295,6 +297,8 @@ def replace_receipt_data(receipt_id: int, parsed: ParsedReceipt,
         receipt.store_id = parsed.store_id
         receipt.date = parsed.date
         receipt.total_amount = parsed.total
+        receipt.currency = parsed.currency
+        receipt.payment_method = parsed.payment_method
         receipt.loyalty_program = parsed.loyalty_program
         receipt.loyalty_details = parsed.loyalty_details
         receipt.raw_data = parsed.raw_data

@@ -10,7 +10,7 @@ import { use, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
-  AlertTriangle, ArrowLeft, Check, Eye, EyeOff, FileText, Pencil, Plus,
+  AlertTriangle, ArrowLeft, Check, Download, Eye, EyeOff, FileText, Pencil, Plus,
   RefreshCw, Trash2, UtensilsCrossed,
 } from "lucide-react"
 import {
@@ -246,9 +246,11 @@ export default function ReceiptDetailPage({ params }: { params: Promise<{ id: st
                       {showSource ? <EyeOff className="h-3.5 w-3.5" aria-hidden /> : <Eye className="h-3.5 w-3.5" aria-hidden />}
                       {showSource ? t("detail.source.hide") : t("detail.source.show")}
                     </ActionButton>
-                    <ActionButton onClick={doReprocess} disabled={busy} title={t("detail.reprocess.hint")}>
-                      <RefreshCw className="h-3.5 w-3.5" aria-hidden /> {t("detail.reprocess")}
-                    </ActionButton>
+                    {receipt.source_kind !== "json" && (
+                      <ActionButton onClick={doReprocess} disabled={busy} title={t("detail.reprocess.hint")}>
+                        <RefreshCw className="h-3.5 w-3.5" aria-hidden /> {t("detail.reprocess")}
+                      </ActionButton>
+                    )}
                   </>
                 )}
                 <ActionButton onClick={toPantry} disabled={busy}>
@@ -291,8 +293,14 @@ export default function ReceiptDetailPage({ params }: { params: Promise<{ id: st
                   <div className="flex items-center gap-2 border-b border-border p-3">
                     <FileText className="h-4 w-4 text-primary" aria-hidden />
                     <span className="hud-label">{t("detail.source.hint")}</span>
+                    <a
+                      href={`${receiptSourceUrl(receiptId)}?download=1`}
+                      className="ml-auto flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    >
+                      <Download className="h-3.5 w-3.5" aria-hidden /> {t("detail.source.download")}
+                    </a>
                   </div>
-                  {receipt.source_kind === "pdf" ? (
+                  {receipt.source_kind === "pdf" || receipt.source_kind === "json" ? (
                     <iframe
                       src={receiptSourceUrl(receiptId)}
                       title={t("detail.source.hint")}
